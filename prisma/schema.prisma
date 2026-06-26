@@ -1,0 +1,103 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/db/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String        @id
+  name          String
+  email         String
+  emailVerified Boolean       @default(false)
+  image         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  isAnonymous   Boolean?      @default(false)
+  sessions      Session[]
+  accounts      Account[]
+  compressions  Compression[]
+
+  @@unique([email])
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId])
+  @@map("session")
+}
+
+model Compression {
+  id          String            @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  userId      String
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  filename    String
+  status      CompressionStatus @default(PENDING_UPLOAD)
+  contentType String
+  sourceKey   String            @unique
+  sourceSize  BigInt?
+  outputKey   String?
+  outputSize  BigInt?
+  error       String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  completedAt DateTime?
+
+  @@index([userId, status])
+  @@index([status])
+  @@map("compression")
+}
+
+enum CompressionStatus {
+  PENDING_UPLOAD
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}

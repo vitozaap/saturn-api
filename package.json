@@ -1,0 +1,46 @@
+{
+  "name": "api",
+  "private": true,
+  "packageManager": "npm@11.17.0",
+  "scripts": {
+    "build": "nest build",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "start:prod": "node dist/main",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "prisma db seed"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1075.0",
+    "@aws-sdk/credential-providers": "^3.1075.0",
+    "@aws-sdk/s3-request-presigner": "^3.1075.0",
+    "@better-auth/prisma-adapter": "^1.6.20",
+    "@nestjs/common": "^11.1.27",
+    "@nestjs/config": "^4.0.4",
+    "@nestjs/core": "^11.1.27",
+    "@nestjs/platform-express": "^11.1.27",
+    "@nestjs/swagger": "^11.4.4",
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "@scalar/nestjs-api-reference": "^1.2.5",
+    "@thallesp/nestjs-better-auth": "^2.6.1",
+    "better-auth": "^1.6.20",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1",
+    "dotenv": "^17.4.2",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.0",
+    "@nestjs/schematics": "^11.0.0",
+    "@types/express": "^5.0.0",
+    "@types/node": "^26.0.0",
+    "prisma": "^7.8.0",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
+  }
+}
