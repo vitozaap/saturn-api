@@ -17,7 +17,7 @@ export class S3Service extends S3Client {
         this.bucket = this.configService.getOrThrow("BUCKET")
     }
 
-    private safeName(filename: string) {
+    safeName(filename: string) {
         return filename.replace(/[/\\]/g, "_")
     }
 
