@@ -1,5 +1,5 @@
 import { prismaAdapter } from "@better-auth/prisma-adapter";
-import { betterAuth } from "better-auth";
+import { betterAuth } from "better-auth/minimal";
 import { anonymous, openAPI } from "better-auth/plugins";
 import { createPrismaClient } from "./prisma";
 import { env } from "../config/env";
