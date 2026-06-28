@@ -1,0 +1,14 @@
+node_modules
+dist
+.github
+README.md
+CLAUDE.md
+.env
+.env.example
+Dockerfile
+.gitignore
+src/db/generated
+docker-compose.yml
+tsconfig.tsbuildinfo
+coverage
+*.log
