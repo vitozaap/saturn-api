@@ -1,7 +1,7 @@
 import { AUTH_CONFIG } from "./symbols";
 import { PrismaService } from "../../db/prisma.service";
 import { ConfigService } from "@nestjs/config";
-import { betterAuth } from "better-auth";
+import { betterAuth } from "better-auth/minimal";
 import { anonymous, openAPI } from "better-auth/plugins";
 import { prismaAdapter } from "@better-auth/prisma-adapter";
 import type { Env } from "../env";
