@@ -34,7 +34,11 @@ export class S3Service extends S3Client {
             Key: params.key,
             ContentType: params.contentType,
         })
-        return await getSignedUrl(this, command)
+        // Force content-type into the signature so S3 rejects the upload
+        // when the PUT's Content-Type differs from the one signed here.
+        return await getSignedUrl(this, command, {
+            signableHeaders: new Set(["content-type"]),
+        })
     }
 
 
