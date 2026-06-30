@@ -1,0 +1,23 @@
+# Migration runner — one-off image that applies Prisma migrations against RDS
+# from inside the VPC. Kept separate from the API image so production stays lean
+# (the API image prunes the Prisma CLI and never ships the migrations folder).
+FROM node:24-alpine AS migrate
+WORKDIR /app
+
+# Prisma's schema engine (used by `migrate deploy`) needs openssl on Alpine.
+RUN apk add --no-cache openssl
+
+# Only the Prisma CLI + dotenv (prisma.config.ts imports "dotenv/config").
+# Pinned to match the app's prisma version so the migration format lines up.
+RUN npm init -y >/dev/null \
+  && npm install --no-fund --no-audit prisma@^7.8.0 dotenv
+
+# Schema + migrations + config. The datasource url comes from $DATABASE_URL at
+# runtime (injected from SSM via the task definition).
+COPY prisma ./prisma
+COPY prisma.config.ts ./prisma.config.ts
+
+# RDS enforces TLS (rds.force_ssl=1). `require` encrypts without CA verification —
+# enough to satisfy force_ssl for this transient in-VPC task. The append assumes
+# the SSM DATABASE_URL carries no existing query string (verify before deploy).
+CMD ["sh", "-c", "DATABASE_URL=\"$DATABASE_URL?sslmode=require\" npx prisma migrate deploy"]
