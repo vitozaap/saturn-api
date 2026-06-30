@@ -8,7 +8,8 @@ const schema = z.object({
     WEB_URL: z.url().nonempty(),
     BUCKET: z.string().nonempty(),
     UPLOADS_PATH: z.string().nonempty(),
-    NODE_ENV: z.string().nonempty()
+    NODE_ENV: z.string().nonempty(),
+    REDIS_URL: z.url().nonempty()
 })
 
 type Env = z.infer<typeof schema>

@@ -18,4 +18,16 @@ export class CompressorRepository implements CompressorContract {
         })
     }
 
+    async findManyByUser(userId: string) {
+        return await this.prisma.compression.findMany({
+            where: { userId },
+            orderBy: { createdAt: "desc" }
+        })
+    }
+
+    async findOwnedById(userId: string, id: string) {
+        return await this.prisma.compression.findFirst({
+            where: { id, userId }
+        })
+    }
 }
