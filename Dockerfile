@@ -33,5 +33,9 @@ COPY --from=builder /build/src/db/generated ./src/db/generated
 # Copy compiled app
 COPY --from=builder /build/dist ./dist
 
+# Amazon RDS CA bundle so the Postgres driver can verify TLS to RDS (rds.force_ssl=1)
+RUN mkdir -p /app/certs \
+  && wget -qO /app/certs/global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
+
 USER node
 CMD ["node", "dist/main.js"]
