@@ -1,8 +1,13 @@
 name: Build and deploy API to ECS
-# TODO: Run migration deploy if touch on /migrations
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_migrations:
+        description: "Force prisma migrate deploy (bootstrap / manual re-run)"
+        type: boolean
+        default: false
 
 permissions:
   id-token: write
@@ -15,6 +20,8 @@ env:
   ECS_SERVICE: saturn-api-service
   TASK_FAMILY: saturn-api
   CONTAINER_NAME: api
+  MIGRATE_TASK_FAMILY: saturn-api-migrate
+  MIGRATE_CONTAINER_NAME: migrate
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -32,7 +39,31 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build, tag and push image to ECR
+      # --- Decide whether to run Prisma migrations -----------------------------
+      # Migrations run only when prisma/migrations/** changes (push) or when
+      # triggered manually with run_migrations=true (bootstrap / re-run).
+      - name: Detect migration changes
+        id: changes
+        if: github.event_name == 'push'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            migrations:
+              - 'prisma/migrations/**'
+
+      - name: Decide whether to run migrations
+        id: migr
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.run_migrations }}" = "true" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          elif [ "${{ steps.changes.outputs.migrations }}" = "true" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # --- Build the API image (always) ----------------------------------------
+      - name: Build, tag and push API image to ECR
         id: build
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -43,6 +74,72 @@ jobs:
           docker push "$IMAGE"
           echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
 
+      # Run migrations BEFORE the service deploy
+      - name: Build, tag and push migrate image to ECR
+        id: build-migrate
+        if: steps.migr.outputs.run == 'true'
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          IMAGE="$REGISTRY/$REPOSITORY:$IMAGE_TAG-migrate"
+          docker build -f Dockerfile.migrate -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+
+      - name: Download migrate task definition
+        if: steps.migr.outputs.run == 'true'
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "$MIGRATE_TASK_FAMILY" \
+            --query taskDefinition \
+            | jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' \
+            > migrate-task-definition.json
+
+      - name: Render migrate image into task definition
+        id: render-migrate
+        if: steps.migr.outputs.run == 'true'
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: migrate-task-definition.json
+          container-name: ${{ env.MIGRATE_CONTAINER_NAME }}
+          image: ${{ steps.build-migrate.outputs.image }}
+
+      - name: Register migrate task definition
+        id: register-migrate
+        if: steps.migr.outputs.run == 'true'
+        run: |
+          ARN=$(aws ecs register-task-definition \
+            --cli-input-json "file://${{ steps.render-migrate.outputs.task-definition }}" \
+            --query 'taskDefinition.taskDefinitionArn' --output text)
+          echo "arn=$ARN" >> "$GITHUB_OUTPUT"
+
+      - name: Run Prisma migrations (ECS run-task) and wait
+        if: steps.migr.outputs.run == 'true'
+        run: |
+          RUN_JSON=$(aws ecs run-task \
+            --cluster "$ECS_CLUSTER" \
+            --task-definition "${{ steps.register-migrate.outputs.arn }}" \
+            --launch-type EC2)
+          TASK_ARN=$(echo "$RUN_JSON" | jq -r '.tasks[0].taskArn // empty')
+          if [ -z "$TASK_ARN" ]; then
+            echo "::error::run-task placed no task (no capacity on the instance?)"
+            echo "$RUN_JSON" | jq '.failures'
+            exit 1
+          fi
+          echo "Migrate task: $TASK_ARN"
+          aws ecs wait tasks-stopped --cluster "$ECS_CLUSTER" --tasks "$TASK_ARN"
+          EXIT=$(aws ecs describe-tasks --cluster "$ECS_CLUSTER" --tasks "$TASK_ARN" \
+            --query 'tasks[0].containers[0].exitCode' --output text)
+          REASON=$(aws ecs describe-tasks --cluster "$ECS_CLUSTER" --tasks "$TASK_ARN" \
+            --query 'tasks[0].stoppedReason' --output text)
+          echo "Exit code: $EXIT | stopped reason: $REASON"
+          if [ "$EXIT" != "0" ]; then
+            echo "::error::prisma migrate deploy failed (exit $EXIT). Check logs at /ecs/saturn-api stream migrate/."
+            exit 1
+          fi
+
+      # --- Deploy the API (always, only after migrations succeed) ---------------
       # The task definition pins the image by digest, so a new revision is
       # required to roll out a new image. Pull the current one, swap the image,
       # register a new revision and update the service.
