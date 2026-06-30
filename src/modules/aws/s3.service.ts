@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3"
 import { fromIni } from "@aws-sdk/credential-providers"
 import { ConfigService } from "@nestjs/config";
-import { Env } from "../../config/env";
+import { env, Env } from "../../config/env";
 import { GetUploadUrlParams } from "./types";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 @Injectable()
@@ -10,8 +10,8 @@ export class S3Service extends S3Client {
     private readonly bucket: string;
     constructor(private readonly configService: ConfigService<Env>) {
         super({
-            // current reading credentials via AWS CLI
-            credentials: fromIni({ profile: "saturn" }),
+            // Reads credentials from Ini if on dev environment
+            credentials: configService.getOrThrow("NODE_ENV") == "production" ? undefined : fromIni({ profile: "saturn" }),
             region: "sa-east-1"
         })
         this.bucket = this.configService.getOrThrow("BUCKET")
