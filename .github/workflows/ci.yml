@@ -22,10 +22,6 @@ jobs:
         run: npm ci
 
       - name: Generate prisma client
-        # Dummy DATABASE_URL satisfies prisma.config.ts env() at load time
-        env:
-          DATABASE_URL: "postgresql://u:p@localhost:5432/db"
-
         run: npx prisma generate
 
       - name: Run Vitest tests
