@@ -1,5 +1,4 @@
-name: Deploy new image to ECR
-# TODO: Update ECS images too
+name: Build and deploy API to ECS
 # TODO: Run migration deploy if touch on /migrations
 on:
   push:
@@ -12,6 +11,10 @@ env:
   AWS_REGION: sa-east-1
   REPOSITORY: saturn/api
   ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+  ECS_CLUSTER: saturn-api-cluster
+  ECS_SERVICE: saturn-api-service
+  TASK_FAMILY: saturn-api
+  CONTAINER_NAME: api
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -29,10 +32,40 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build, tag and push image to ECR repository
+      - name: Build, tag and push image to ECR
+        id: build
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -t "$REGISTRY/$REPOSITORY:$IMAGE_TAG" .
-          docker push "$REGISTRY/$REPOSITORY:$IMAGE_TAG"
+          IMAGE="$REGISTRY/$REPOSITORY:$IMAGE_TAG"
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+
+      # The task definition pins the image by digest, so a new revision is
+      # required to roll out a new image. Pull the current one, swap the image,
+      # register a new revision and update the service.
+      - name: Download current ECS task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "$TASK_FAMILY" \
+            --query taskDefinition \
+            | jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' \
+            > task-definition.json
+
+      - name: Render new image into task definition
+        id: render
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ steps.build.outputs.image }}
+
+      - name: Deploy to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
