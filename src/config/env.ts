@@ -7,7 +7,8 @@ const schema = z.object({
     BETTER_AUTH_URL: z.url().nonempty(),
     WEB_URL: z.url().nonempty(),
     BUCKET: z.string().nonempty(),
-    UPLOADS_PATH: z.string().nonempty()
+    UPLOADS_PATH: z.string().nonempty(),
+    NODE_ENV: z.string().nonempty()
 })
 
 type Env = z.infer<typeof schema>
