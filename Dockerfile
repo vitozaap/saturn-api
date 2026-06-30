@@ -10,8 +10,8 @@ WORKDIR /build
 COPY --from=deps /deps/node_modules ./node_modules
 COPY . .
 
-# Dummy DATABASE_URL satisfies prisma.config.ts env() at load time; generate does not connect.
-RUN DATABASE_URL="postgresql://u:p@localhost:5432/db" npx prisma generate
+# prisma.config.ts falls back to a dummy URL, so generate needs no DATABASE_URL.
+RUN npx prisma generate
 RUN npm run build
 # Strip devDeps 
 RUN npm prune --omit=dev

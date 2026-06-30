@@ -2,7 +2,7 @@ name: Code Quality & Testing
 
 on:
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   test:
@@ -16,10 +16,13 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: 24
-          cache: 'npm'     
+          cache: "npm"
 
       - name: Install dependencies
-        run: npm ci        
+        run: npm ci
+
+      - name: Generate prisma client
+        run: npx prisma generate
 
       - name: Run Vitest tests
         run: npm run test
