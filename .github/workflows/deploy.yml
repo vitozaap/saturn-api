@@ -1,4 +1,4 @@
-name: Build and deploy API to ECS
+name: Build and deploy API to Lambda LWA
 on:
   push:
     branches: [main]
@@ -16,12 +16,11 @@ env:
   AWS_REGION: sa-east-1
   REPOSITORY: saturn/api
   ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
-  ECS_CLUSTER: saturn-api-cluster
-  ECS_SERVICE: saturn-api-service
-  TASK_FAMILY: saturn-api
-  CONTAINER_NAME: api
-  MIGRATE_TASK_FAMILY: saturn-api-migrate
-  MIGRATE_CONTAINER_NAME: migrate
+  FUNCTION_NAME: squish-api
+
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -73,96 +72,20 @@ jobs:
           docker build -t "$IMAGE" .
           docker push "$IMAGE"
           echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
-
-      # Run migrations BEFORE the service deploy
-      - name: Build, tag and push migrate image to ECR
-        id: build-migrate
+      - name: Run prisma migrations
         if: steps.migr.outputs.run == 'true'
         env:
-          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        # installs dependencies and donwload aws certs from web
         run: |
-          IMAGE="$REGISTRY/$REPOSITORY:$IMAGE_TAG-migrate"
-          docker build -f Dockerfile.migrate -t "$IMAGE" .
-          docker push "$IMAGE"
-          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+          npm install --no-save prisma@7.8.0 dotenv 
+          curl -sSL -o global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
+          npx prisma migrate deploy
 
-      - name: Download migrate task definition
-        if: steps.migr.outputs.run == 'true'
+      # Deploy to lambda LWA only after the migration is done.
+      - name: Deploy lambda function (LWA)
+        id: deploy-api
         run: |
-          aws ecs describe-task-definition \
-            --task-definition "$MIGRATE_TASK_FAMILY" \
-            --query taskDefinition \
-            | jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' \
-            > migrate-task-definition.json
-
-      - name: Render migrate image into task definition
-        id: render-migrate
-        if: steps.migr.outputs.run == 'true'
-        uses: aws-actions/amazon-ecs-render-task-definition@v1
-        with:
-          task-definition: migrate-task-definition.json
-          container-name: ${{ env.MIGRATE_CONTAINER_NAME }}
-          image: ${{ steps.build-migrate.outputs.image }}
-
-      - name: Register migrate task definition
-        id: register-migrate
-        if: steps.migr.outputs.run == 'true'
-        run: |
-          ARN=$(aws ecs register-task-definition \
-            --cli-input-json "file://${{ steps.render-migrate.outputs.task-definition }}" \
-            --query 'taskDefinition.taskDefinitionArn' --output text)
-          echo "arn=$ARN" >> "$GITHUB_OUTPUT"
-
-      - name: Run Prisma migrations (ECS run-task) and wait
-        if: steps.migr.outputs.run == 'true'
-        run: |
-          RUN_JSON=$(aws ecs run-task \
-            --cluster "$ECS_CLUSTER" \
-            --task-definition "${{ steps.register-migrate.outputs.arn }}" \
-            --launch-type EC2)
-          TASK_ARN=$(echo "$RUN_JSON" | jq -r '.tasks[0].taskArn // empty')
-          if [ -z "$TASK_ARN" ]; then
-            echo "::error::run-task placed no task (no capacity on the instance?)"
-            echo "$RUN_JSON" | jq '.failures'
-            exit 1
-          fi
-          echo "Migrate task: $TASK_ARN"
-          aws ecs wait tasks-stopped --cluster "$ECS_CLUSTER" --tasks "$TASK_ARN"
-          EXIT=$(aws ecs describe-tasks --cluster "$ECS_CLUSTER" --tasks "$TASK_ARN" \
-            --query 'tasks[0].containers[0].exitCode' --output text)
-          REASON=$(aws ecs describe-tasks --cluster "$ECS_CLUSTER" --tasks "$TASK_ARN" \
-            --query 'tasks[0].stoppedReason' --output text)
-          echo "Exit code: $EXIT | stopped reason: $REASON"
-          if [ "$EXIT" != "0" ]; then
-            echo "::error::prisma migrate deploy failed (exit $EXIT). Check logs at /ecs/saturn-api stream migrate/."
-            exit 1
-          fi
-
-      # --- Deploy the API (always, only after migrations succeed) ---------------
-      # The task definition pins the image by digest, so a new revision is
-      # required to roll out a new image. Pull the current one, swap the image,
-      # register a new revision and update the service.
-      - name: Download current ECS task definition
-        run: |
-          aws ecs describe-task-definition \
-            --task-definition "$TASK_FAMILY" \
-            --query taskDefinition \
-            | jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' \
-            > task-definition.json
-
-      - name: Render new image into task definition
-        id: render
-        uses: aws-actions/amazon-ecs-render-task-definition@v1
-        with:
-          task-definition: task-definition.json
-          container-name: ${{ env.CONTAINER_NAME }}
-          image: ${{ steps.build.outputs.image }}
-
-      - name: Deploy to ECS
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
-        with:
-          task-definition: ${{ steps.render.outputs.task-definition }}
-          service: ${{ env.ECS_SERVICE }}
-          cluster: ${{ env.ECS_CLUSTER }}
-          wait-for-service-stability: true
+          aws lambda update-function-code --function-name ${{ env.FUNCTION_NAME }} \
+          --image-uri ${{ steps.build.outputs.image }} --publish
+          aws lambda wait function-updated --function-name ${{ env.FUNCTION_NAME }}

@@ -20,6 +20,10 @@ RUN npm prune --omit=dev
 FROM node:24-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+ENV PORT=8080
+COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:1.0.1 /lambda-adapter /opt/extensions/lambda-adapter
+ENV AWS_LWA_INVOKE_MODE=response_stream
+ENV AWS_LWA_READINESS_CHECK_PATH=/reference
 
 # Copy pruned prod node_modules from builder
 COPY --from=builder /build/node_modules ./node_modules
