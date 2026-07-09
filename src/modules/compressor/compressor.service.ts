@@ -5,6 +5,7 @@ import { RedisSubscriberService } from "../../db/redis.subscriber.service";
 import { CompressorContract } from "./compressor.contract";
 import { RequestCompressionDto } from "./dto/request-compression.dto";
 import { isTerminal, toCompressionResponse } from "./compression.mapper";
+import { ConfirmUploadDto } from "./dto/confirm-upload.dto";
 
 // Safety poll: re-read the DB even when no Redis ping arrives, so a lost
 // PUBLISH can't strand a stream on a stale state.
@@ -56,5 +57,12 @@ export class CompressorService {
             takeWhile((row) => !isTerminal(row.status), true),
             map((row) => ({ data: toCompressionResponse(row) }) satisfies MessageEvent),
         )
+    }
+
+    async confirmUpload(userId: string, dto: ConfirmUploadDto) {
+        const sourceKey = await this.repository.findSourceKeyById(userId, dto.compressionId)
+        // TODO: Get sourceSize from minIO using the sourceKey 
+        // const sourceSize = 
+        // await this.repository.updateStatusById(userId, dto.compressionId, sourceSize)
     }
 }

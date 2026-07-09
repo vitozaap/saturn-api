@@ -6,4 +6,6 @@ export abstract class CompressorContract {
     abstract saveCompression(userId: string, sourceKey: string, dto: RequestCompressionDto): Promise<{ id: string }>
     abstract findManyByUser(userId: string): Promise<Compression[]>
     abstract findOwnedById(userId: string, id: string): Promise<Compression | null>
+    abstract findSourceKeyById(userId: string, id: string): Promise<{ sourceKey: string } | null>
+    abstract updateStatusById(userId: string, id: string, sourceSize: bigint): Promise<void>
 }

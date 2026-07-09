@@ -1,7 +1,8 @@
-import { Injectable } from "@nestjs/common";
+import { ConflictException, Injectable } from "@nestjs/common";
 import { CompressorContract } from "./compressor.contract";
 import { PrismaService } from "../../db/prisma.service";
 import { RequestCompressionDto } from "./dto/request-compression.dto";
+import { CompressionStatus } from "../../db/generated/prisma/enums";
 
 
 @Injectable()
@@ -29,5 +30,21 @@ export class CompressorRepository implements CompressorContract {
         return await this.prisma.compression.findFirst({
             where: { id, userId }
         })
+    }
+
+    async findSourceKeyById(userId: string, id: string): Promise<{ sourceKey: string; } | null> {
+        return await this.prisma.compression.findFirst({
+            where: { userId: userId, id: id },
+            select: { sourceKey: true }
+        })
+    }
+
+    async updateStatusById(userId: string, id: string, sourceSize: bigint): Promise<void> {
+        const { count } = await this.prisma.compression.updateMany({
+            where: { id: id, userId: userId },
+            data: { sourceSize: sourceSize, status: "QUEUED" }
+        })
+        if (count === 0)
+            throw new ConflictException()
     }
 }

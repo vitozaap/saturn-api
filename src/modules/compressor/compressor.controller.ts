@@ -1,5 +1,5 @@
 import { Body, Controller, Get, MessageEvent, Param, Post, Session, Sse } from "@nestjs/common";
-import { ApiBadRequestResponse, ApiCreatedResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiTags } from "@nestjs/swagger";
+import { ApiBadRequestResponse, ApiConflictResponse, ApiCreatedResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiTags } from "@nestjs/swagger";
 import { Observable } from "rxjs";
 import { RequestCompressionDto } from "./dto/request-compression.dto";
 import { RequestCompressionResponseDto } from "./dto/request-compression-response.dto";
@@ -7,6 +7,7 @@ import { CompressionResponseDto } from "./compression.mapper";
 import { CompressorService } from "./compressor.service";
 import { UserSession } from "@thallesp/nestjs-better-auth";
 import { ApiAuthErrors } from "../../common/swagger.decorators";
+import { ConfirmUploadDto } from "./dto/confirm-upload.dto";
 
 
 @ApiTags("compressor")
@@ -44,5 +45,12 @@ export class CompressorController {
     @ApiNotFoundResponse({ description: "Compression not found or not owned by the user." })
     async stream(@Param("id") id: string, @Session() session: UserSession): Promise<Observable<MessageEvent>> {
         return await this.service.streamCompression(session.user.id, id)
+    }
+
+    @ApiOperation({summary: "Update compression status", description: "Updates a single compression status and its sourceSize."})
+    @ApiNotFoundResponse({description: "Uploaded file not found or not uploaded yet."})
+    @ApiConflictResponse({description: "Invalid ID, compression already queued or not existent."})
+    async confirmUpload(@Body() confirmUploadDto: ConfirmUploadDto, @Session() session: UserSession,) {
+        return await this.service.confirmUpload(session.user.id, confirmUploadDto)
     }
 }

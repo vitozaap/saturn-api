@@ -38,9 +38,11 @@ describe("CompressorService", () => {
         saveCompression: vi.fn().mockResolvedValue({ id: "comp-1" }),
         findManyByUser: vi.fn(),
         findOwnedById: vi.fn(),
+        updateStatusById: vi.fn(),
+        findSourceKeyById: vi.fn()
     } satisfies CompressorContract
     const mockEvents = {
-        channel: vi.fn(() => new Subject<string>()),    
+        channel: vi.fn(() => new Subject<string>()),
     }
 
     beforeEach(async () => {
