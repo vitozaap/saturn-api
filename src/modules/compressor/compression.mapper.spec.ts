@@ -1,7 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { isTerminal, toCompressionResponse } from "./compression.mapper";
-import { Compression } from "../../db/generated/prisma/client";
-
+import { describe, it, expect } from "vitest"
+import { isTerminal, toCompressionResponse } from "./compression.mapper"
+import { Compression } from "../../db/generated/prisma/client"
 
 function makeRow(overrides: Partial<Compression> = {}): Compression {
     return {

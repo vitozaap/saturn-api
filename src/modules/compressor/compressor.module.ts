@@ -1,10 +1,9 @@
-import { Module } from "@nestjs/common";
-import { CompressorController } from "./compressor.controller";
-import { CompressorService } from "./compressor.service";
-import { CompressorContract } from "./compressor.contract";
-import { CompressorRepository } from "./compressor.repository";
-import { AwsModule } from "../aws/aws.module";
-
+import { Module } from "@nestjs/common"
+import { CompressorController } from "./compressor.controller"
+import { CompressorService } from "./compressor.service"
+import { CompressorContract } from "./compressor.contract"
+import { CompressorRepository } from "./compressor.repository"
+import { AwsModule } from "../aws/aws.module"
 
 @Module({
     imports: [AwsModule],
@@ -13,8 +12,8 @@ import { AwsModule } from "../aws/aws.module";
         CompressorService,
         {
             provide: CompressorContract,
-            useClass: CompressorRepository
-        }
-    ]
+            useClass: CompressorRepository,
+        },
+    ],
 })
-export class CompressorModule { }
+export class CompressorModule {}
