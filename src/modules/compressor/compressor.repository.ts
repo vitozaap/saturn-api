@@ -1,50 +1,48 @@
-import { ConflictException, Injectable } from "@nestjs/common";
-import { CompressorContract } from "./compressor.contract";
-import { PrismaService } from "../../db/prisma.service";
-import { RequestCompressionDto } from "./dto/request-compression.dto";
-import { CompressionStatus } from "../../db/generated/prisma/enums";
-
+import { ConflictException, Injectable } from "@nestjs/common"
+import { CompressorContract } from "./compressor.contract"
+import { PrismaService } from "../../db/prisma.service"
+import { RequestCompressionDto } from "./dto/request-compression.dto"
+import { CompressionStatus } from "../../db/generated/prisma/enums"
 
 @Injectable()
 export class CompressorRepository implements CompressorContract {
-    constructor(private readonly prisma: PrismaService) { }
+    constructor(private readonly prisma: PrismaService) {}
     async saveCompression(userId: string, sourceKey: string, dto: RequestCompressionDto) {
         return await this.prisma.compression.create({
             data: {
                 filename: dto.filename,
                 userId: userId,
                 contentType: dto.contentType,
-                sourceKey: sourceKey
-            }
+                sourceKey: sourceKey,
+            },
         })
     }
 
     async findManyByUser(userId: string) {
         return await this.prisma.compression.findMany({
             where: { userId },
-            orderBy: { createdAt: "desc" }
+            orderBy: { createdAt: "desc" },
         })
     }
 
     async findOwnedById(userId: string, id: string) {
         return await this.prisma.compression.findFirst({
-            where: { id, userId }
+            where: { id, userId },
         })
     }
 
-    async findSourceKeyById(userId: string, id: string): Promise<{ sourceKey: string; } | null> {
+    async findSourceKeyById(userId: string, id: string): Promise<{ sourceKey: string } | null> {
         return await this.prisma.compression.findFirst({
             where: { userId: userId, id: id },
-            select: { sourceKey: true }
+            select: { sourceKey: true },
         })
     }
 
     async updateStatusById(userId: string, id: string, sourceSize: bigint): Promise<void> {
         const { count } = await this.prisma.compression.updateMany({
-            where: { id: id, userId: userId },
-            data: { sourceSize: sourceSize, status: "QUEUED" }
+            where: { id: id, userId: userId, status: "PENDING_UPLOAD" },
+            data: { sourceSize: sourceSize, status: "QUEUED" },
         })
-        if (count === 0)
-            throw new ConflictException()
+        if (count === 0) throw new ConflictException()
     }
 }
