@@ -19,9 +19,9 @@ This package (`api/`) is the **NestJS control-plane API**: it authenticates user
 
 ## Application flow
 
-1. **Request compression** — authenticated user calls the API. The API creates a `Compression` row with status `PENDING_UPLOAD` (id generated first via `uuidv7()`), then returns a **presigned S3 upload URL** pointing at `uploads/{userId}/{compressionId}/{filename}`.
+1. **Request compression** — authenticated user calls the API. The API generates a `sourceKey` (`uploads/{userId}/{randomUUID}/{filename}` — the UUID is independent of the compression id), creates a `Compression` row with status `PENDING_UPLOAD`, then returns a **presigned S3 upload URL** for that key.
 2. **Upload** — the user PUTs the video directly to S3 using that URL.
-3. **Enqueue** — the S3 `ObjectCreated` event publishes a message to **SQS**. The object key carries `userId` + `compressionId`, so the row is resolved deterministically (or by `sourceKey`, which is unique).
+3. **Enqueue** — the S3 `ObjectCreated` event publishes a message to **SQS**. The row is resolved by `sourceKey`, which is unique.
 4. **Compress** — Fargate workers poll SQS, transition the row `QUEUED → PROCESSING` (guarded `updateMany` for SQS at-least-once idempotency), and run ffmpeg.
 5. **Deliver** — the compressed file is written to `compressed/{userId}/{compressionId}`; the row is updated to `COMPLETED` with `outputKey`/`outputSize`, or `FAILED` with an `error` message.
 
@@ -33,7 +33,7 @@ This package (`api/`) is the **NestJS control-plane API**: it authenticates user
 
 A single `Compression` model owns the full lifecycle (source → job → output) — there are intentionally **no separate `Video`/`Compressed` tables** (1 upload = 1 job, single output). See `prisma/schema.prisma`. Key conventions:
 
-- `id` is a `uuidv7()` UUID, generated before the presigned URL so it can be embedded in the S3 key.
+- `id` is a `uuidv7()` UUID. It is **not** embedded in the S3 key — the key carries its own random UUID; `sourceKey` (unique) is the object↔row link.
 - File sizes are `BigInt` (videos exceed `Int` / ~2GB).
 - Compression ratio is **derived** (`outputSize / sourceSize`), never stored.
 

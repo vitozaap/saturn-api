@@ -1,18 +1,22 @@
-import { Injectable } from "@nestjs/common";
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3"
-import { fromIni } from "@aws-sdk/credential-providers"
-import { ConfigService } from "@nestjs/config";
-import { env, Env } from "../../config/env";
-import { GetUploadUrlParams } from "./types";
+import { Injectable } from "@nestjs/common"
+import { PutObjectCommand, S3Client, HeadObjectCommand } from "@aws-sdk/client-s3"
+import { ConfigService } from "@nestjs/config"
+import { Env } from "../../config/env"
+import { GetUploadUrlParams } from "./types"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 @Injectable()
 export class S3Service extends S3Client {
-    private readonly bucket: string;
+    private readonly bucket: string
     constructor(private readonly configService: ConfigService<Env>) {
         super({
-            // Reads credentials from Ini if on dev environment
-            credentials: configService.getOrThrow("NODE_ENV") == "production" ? undefined : fromIni({ profile: "saturn" }),
-            region: "sa-east-1"
+            // Using minIO as default bucket
+            credentials: {
+                accessKeyId: configService.getOrThrow("MINIO_USER"),
+                secretAccessKey: configService.getOrThrow("MINIO_PASSWORD"),
+            },
+            endpoint: configService.getOrThrow("S3_ENDPOINT"),
+            forcePathStyle: true,
+            region: "sa-east-1",
         })
         this.bucket = this.configService.getOrThrow("BUCKET")
     }
@@ -27,7 +31,6 @@ export class S3Service extends S3Client {
         return `${uploadPath}/${userId}/${crypto.randomUUID()}/${this.safeName(filename)}`
     }
 
-
     async getUploadUrl(params: GetUploadUrlParams) {
         const command = new PutObjectCommand({
             Bucket: this.bucket,
@@ -41,6 +44,23 @@ export class S3Service extends S3Client {
         })
     }
 
+    // Returns the stored object's size in bytes, or null when the key does not
+    // exist yet (user never completed the presigned PUT). BigInt because videos
+    // can exceed Int / ~2GB.
+    async getObjectSourceSize(key: string): Promise<bigint | null> {
+        try {
+            const res = await this.send(
+                new HeadObjectCommand({
+                    Bucket: this.bucket,
+                    Key: key,
+                }),
+            )
+            return res.ContentLength != null ? BigInt(res.ContentLength) : null
+        } catch (err) {
+            if (err instanceof Error && (err.name === "NotFound" || err.name === "NoSuchKey")) return null
+            throw err
+        }
+    }
 
     // TODO: getDownloadUrl
 }

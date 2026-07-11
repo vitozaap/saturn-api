@@ -9,7 +9,10 @@ const schema = z.object({
     BUCKET: z.string().nonempty(),
     UPLOADS_PATH: z.string().nonempty(),
     NODE_ENV: z.string().nonempty(),
-    REDIS_URL: z.url().nonempty()
+    REDIS_URL: z.url().nonempty(),
+    MINIO_USER: z.string().nonempty(),
+    MINIO_PASSWORD: z.string().nonempty(),
+    S3_ENDPOINT: z.url().nonempty()
 })
 
 type Env = z.infer<typeof schema>
