@@ -6,7 +6,7 @@ import { CompressorContract } from "./compressor.contract"
 import { RequestCompressionDto } from "./dto/request-compression.dto"
 import { isTerminal, toCompressionResponse } from "./compression.mapper"
 import { ConfirmUploadDto } from "./dto/confirm-upload.dto"
-
+import * as Sentry from "@sentry/nestjs"
 // Safety poll: re-read the DB even when no Redis ping arrives, so a lost
 // PUBLISH can't strand a stream on a stale state.
 const POLL_MS = 20_000
@@ -64,11 +64,13 @@ export class CompressorService {
     async confirmUpload(userId: string, dto: ConfirmUploadDto) {
         const key = await this.repository.findSourceKeyById(userId, dto.compressionId)
         if (!key?.sourceKey) {
+            Sentry.captureMessage("User sent invalid source key")
             throw new NotFoundException()
         }
         const ContentLength = await this.s3.getObjectSourceSize(key.sourceKey)
 
         if (ContentLength === null) {
+            Sentry.captureMessage("User sent content length with null or 0 value")
             throw new NotFoundException()
         }
 
