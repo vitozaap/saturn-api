@@ -1,91 +1,94 @@
-name: Build and deploy API to Lambda LWA
+name: Build and deploy API to VPS
 on:
-  push:
-    branches: [main]
-  workflow_dispatch:
-    inputs:
-      run_migrations:
-        description: "Force prisma migrate deploy (bootstrap / manual re-run)"
-        type: boolean
-        default: false
+    push:
+        branches: [main]
+    workflow_dispatch:
+        inputs:
+            run_migrations:
+                description: "Force prisma migrate deploy (bootstrap / manual re-run)"
+                type: boolean
+                default: false
 
 permissions:
-  id-token: write
-  contents: read
-env:
-  AWS_REGION: sa-east-1
-  REPOSITORY: saturn/api
-  ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
-  FUNCTION_NAME: squish-api
+    packages: write
+    contents: read
 
 concurrency:
-  group: deploy-api
-  cancel-in-progress: false
+    group: deploy-api
+    cancel-in-progress: false
 jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    deploy:
+        runs-on: ubuntu-24.04-arm
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
 
-      - name: Configure AWS Credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-region: ${{ env.AWS_REGION }}
-          role-to-assume: ${{ env.ROLE_ARN }}
+            # Decide whether to run Prisma migrations
+            # Migrations run only when prisma/migrations/** changes (push) or when
+            # triggered manually with run_migrations=true (bootstrap / re-run).
+            - name: Detect migration changes
+              id: changes
+              if: github.event_name == 'push'
+              uses: dorny/paths-filter@v3
+              with:
+                  filters: |
+                      migrations:
+                        - 'prisma/migrations/**'
 
-      - name: Login to ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
+            - name: Decide whether to run migrations
+              id: migr
+              run: |
+                  if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.run_migrations }}" = "true" ]; then
+                    echo "run=true" >> "$GITHUB_OUTPUT"
+                  elif [ "${{ steps.changes.outputs.migrations }}" = "true" ]; then
+                    echo "run=true" >> "$GITHUB_OUTPUT"
+                  else
+                    echo "run=false" >> "$GITHUB_OUTPUT"
+                  fi
 
-      # --- Decide whether to run Prisma migrations -----------------------------
-      # Migrations run only when prisma/migrations/** changes (push) or when
-      # triggered manually with run_migrations=true (bootstrap / re-run).
-      - name: Detect migration changes
-        id: changes
-        if: github.event_name == 'push'
-        uses: dorny/paths-filter@v3
-        with:
-          filters: |
-            migrations:
-              - 'prisma/migrations/**'
+            - name: Login to GHCR
+              uses: docker/login-action@v3
+              with:
+                  registry: ghcr.io
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+            - name: Build and push image (arm64)
+              env:
+                  IMAGE: ghcr.io/vitozaap/saturn-api
+              run: |
+                  docker build -t "$IMAGE:latest" -t "$IMAGE:${{ github.sha }}" .
+                  docker push "$IMAGE:latest"
+                  docker push "$IMAGE:${{ github.sha }}"
+            - name: Run prisma migrations
+              if: steps.migr.outputs.run == 'true'
+              env:
+                  DATABASE_URL: ${{ secrets.DATABASE_URL_DIRECT }}
+              # installs dependencies
+              run: |
+                  npm install --no-save prisma@7.8.0 dotenv 
+                  npx prisma migrate deploy
+            - name: Copy compose file into VPS over SSH
+              uses: appleboy/scp-action@v1
+              with:
+                  host: ${{ secrets.VPS_HOST }}
+                  username: ${{ secrets.VPS_USER }}
+                  key: ${{ secrets.VPS_SSH_KEY }}
+                  source: compose.prod.yml
+                  target: ~/saturn-api
 
-      - name: Decide whether to run migrations
-        id: migr
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.run_migrations }}" = "true" ]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          elif [ "${{ steps.changes.outputs.migrations }}" = "true" ]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      # --- Build the API image (always) ----------------------------------------
-      - name: Build, tag and push API image to ECR
-        id: build
-        env:
-          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          IMAGE="$REGISTRY/$REPOSITORY:$IMAGE_TAG"
-          docker build -t "$IMAGE" .
-          docker push "$IMAGE"
-          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
-      - name: Run prisma migrations
-        if: steps.migr.outputs.run == 'true'
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        # installs dependencies and donwload aws certs from web
-        run: |
-          npm install --no-save prisma@7.8.0 dotenv 
-          curl -sSL -o global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
-          npx prisma migrate deploy
-
-      # Deploy to lambda LWA only after the migration is done.
-      - name: Deploy lambda function (LWA)
-        id: deploy-api
-        run: |
-          aws lambda update-function-code --function-name ${{ env.FUNCTION_NAME }} \
-          --image-uri ${{ steps.build.outputs.image }} --publish
-          aws lambda wait function-updated --function-name ${{ env.FUNCTION_NAME }}
+            - name: Deploy over SSH
+              uses: appleboy/ssh-action@v1
+              env:
+                  PROD_ENV: ${{ secrets.PROD_ENV }}
+              with:
+                  host: ${{secrets.VPS_HOST}}
+                  username: ${{ secrets.VPS_USER }}
+                  key: ${{ secrets.VPS_SSH_KEY }}
+                  envs: PROD_ENV
+                  script: |
+                      cd ~/saturn-api
+                      printf '%s' "$PROD_ENV" > .env
+                      chmod 600 .env
+                      docker compose -f compose.prod.yml pull
+                      docker compose -f compose.prod.yml up -d
+                      docker image prune -f
