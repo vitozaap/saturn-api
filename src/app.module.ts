@@ -8,8 +8,11 @@ import type { BetterAuthOptions } from "better-auth"
 import { CompressorModule } from "./modules/compressor/compressor.module"
 import { PrismaModule } from "./db/prisma.module"
 import { RedisModule } from "./db/redis.module"
+import { SentryGlobalFilter, SentryModule } from "@sentry/nestjs/setup"
+import { APP_FILTER } from "@nestjs/core"
 @Module({
     imports: [
+        SentryModule.forRoot(),
         ConfigModule.forRoot({
             isGlobal: true,
             validate: validate,
@@ -25,6 +28,11 @@ import { RedisModule } from "./db/redis.module"
         }),
     ],
     controllers: [],
-    providers: [],
+    providers: [
+        {
+            provide: APP_FILTER,
+            useClass: SentryGlobalFilter
+        }
+    ],
 })
 export class AppModule {}
