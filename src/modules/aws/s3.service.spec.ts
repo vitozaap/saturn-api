@@ -11,17 +11,20 @@ describe("S3Service", () => {
                 return "folder"
             }
             return null
-        })
+        }),
     }
     beforeEach(async () => {
         const moduleRef = await Test.createTestingModule({
             controllers: [],
-            providers: [S3Service, {
-                provide: ConfigService,
-                useValue: mockConfigService,
-            }]
+            providers: [
+                S3Service,
+                {
+                    provide: ConfigService,
+                    useValue: mockConfigService,
+                },
+            ],
         }).compile()
-        s3service = moduleRef.get(S3Service);
+        s3service = moduleRef.get(S3Service)
     })
 
     describe("SafeName", () => {
@@ -36,13 +39,12 @@ describe("S3Service", () => {
             const filename = "broken/file/name"
             const mockUUID = "11111111-1111-4111-8111-111111111111"
             const userId = "00000000-0000-0000-0000-000000000000"
-            const spyUUID = vi.spyOn(crypto, 'randomUUID').mockReturnValue(mockUUID)
+            const spyUUID = vi.spyOn(crypto, "randomUUID").mockReturnValue(mockUUID)
             const fn = s3service.generateSourceKey(userId, filename)
 
             expect(mockConfigService.getOrThrow).toHaveBeenLastCalledWith("UPLOADS_PATH")
             expect(spyUUID).toHaveBeenCalledOnce()
             expect(fn).toBe(`folder/${userId}/${mockUUID}/broken_file_name`)
-
         })
     })
 })
