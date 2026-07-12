@@ -80,15 +80,18 @@ jobs:
               uses: appleboy/ssh-action@v1
               env:
                   PROD_ENV: ${{ secrets.PROD_ENV }}
+                  GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
                   host: ${{secrets.VPS_HOST}}
                   username: ${{ secrets.VPS_USER }}
                   key: ${{ secrets.VPS_SSH_KEY }}
-                  envs: PROD_ENV
+                  envs: PROD_ENV,GHCR_TOKEN
                   script: |
+                      echo "$GHCR_TOKEN" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
                       cd ~/saturn-api
                       printf '%s' "$PROD_ENV" > .env
                       chmod 600 .env
                       docker compose -f compose.prod.yml pull
                       docker compose -f compose.prod.yml up -d
                       docker image prune -f
+                      docker logout ghcr.io
