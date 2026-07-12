@@ -66,6 +66,7 @@ export class CompressorController {
         summary: "Update compression status",
         description: "Updates a single compression status and its sourceSize.",
     })
+    @ApiOkResponse({ description: "Compression status set to QUEUED." })
     @ApiNotFoundResponse({ description: "Uploaded file not found or not uploaded yet." })
     @ApiConflictResponse({ description: "Invalid ID, compression already queued or not existent." })
     @HttpCode(HttpStatus.OK)
