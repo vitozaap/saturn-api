@@ -20,10 +20,7 @@ RUN npm prune --omit=dev
 FROM node:24-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
-ENV PORT=8080
-COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:1.0.1 /lambda-adapter /opt/extensions/lambda-adapter
-ENV AWS_LWA_INVOKE_MODE=response_stream
-ENV AWS_LWA_READINESS_CHECK_PATH=/reference
+ENV PORT=3000
 
 # Copy pruned prod node_modules from builder
 COPY --from=builder /build/node_modules ./node_modules
@@ -36,10 +33,6 @@ COPY --from=builder /build/src/db/generated ./src/db/generated
 
 # Copy compiled app
 COPY --from=builder /build/dist ./dist
-
-# Amazon RDS CA bundle so the Postgres driver can verify TLS to RDS (rds.force_ssl=1)
-RUN mkdir -p /app/certs \
-  && wget -qO /app/certs/global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
 
 USER node
 CMD ["node", "dist/main.js"]
