@@ -11,6 +11,7 @@ import { RedisModule } from "./db/redis.module"
 import { SentryGlobalFilter, SentryModule } from "@sentry/nestjs/setup"
 import { APP_FILTER } from "@nestjs/core"
 import { BullModule } from "@nestjs/bullmq"
+import { ScheduleModule } from "@nestjs/schedule"
 @Module({
     imports: [
         SentryModule.forRoot(),
@@ -18,6 +19,7 @@ import { BullModule } from "@nestjs/bullmq"
             isGlobal: true,
             validate: validate,
         }),
+        ScheduleModule.forRoot(),
         BullModule.forRootAsync({
             inject: [ConfigService],
             useFactory: async (configService: ConfigService<Env>) => ({
@@ -45,4 +47,4 @@ import { BullModule } from "@nestjs/bullmq"
         },
     ],
 })
-export class AppModule {}
+export class AppModule { }
