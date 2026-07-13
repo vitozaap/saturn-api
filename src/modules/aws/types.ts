@@ -1,4 +1,4 @@
-
+import { Compression } from "../../db/generated/prisma/client"
 
 type GetUploadUrlParams = {
     key: string
@@ -8,3 +8,5 @@ type GetUploadUrlParams = {
 export type {
     GetUploadUrlParams
 }
+
+export interface Stale extends Pick<Compression, "sourceKey" | "outputKey" | "id"> { }
