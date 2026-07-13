@@ -7,6 +7,7 @@ import { RequestCompressionDto } from "./dto/request-compression.dto"
 import { isTerminal, toCompressionResponse } from "./compression.mapper"
 import { ConfirmUploadDto } from "./dto/confirm-upload.dto"
 import * as Sentry from "@sentry/nestjs"
+import { CompressionProducer } from "./compression.producer"
 // Safety poll: re-read the DB even when no Redis ping arrives, so a lost
 // PUBLISH can't strand a stream on a stale state.
 const POLL_MS = 20_000
@@ -17,6 +18,7 @@ export class CompressorService {
         private readonly s3: S3Service,
         private readonly repository: CompressorContract,
         private readonly events: RedisSubscriberService,
+        private readonly producer: CompressionProducer,
     ) {}
 
     async requestCompression(userId: string, dto: RequestCompressionDto) {
@@ -74,6 +76,10 @@ export class CompressorService {
             throw new NotFoundException()
         }
 
+        // Will try to update compression status
         await this.repository.updateStatusById(userId, dto.compressionId, ContentLength)
+
+        // Calls producer to enqueue the compression by ID
+        await this.producer.enqueue(dto.compressionId)
     }
 }

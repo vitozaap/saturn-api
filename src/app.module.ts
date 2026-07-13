@@ -1,6 +1,6 @@
 import { Module } from "@nestjs/common"
 import { ConfigModule, ConfigService } from "@nestjs/config"
-import { validate } from "./config/env"
+import { Env, validate } from "./config/env"
 import { AuthModule } from "@thallesp/nestjs-better-auth"
 import { AUTH_CONFIG } from "./config/auth/symbols"
 import { AuthConfigModule } from "./config/auth/auth.config.module"
@@ -10,12 +10,22 @@ import { PrismaModule } from "./db/prisma.module"
 import { RedisModule } from "./db/redis.module"
 import { SentryGlobalFilter, SentryModule } from "@sentry/nestjs/setup"
 import { APP_FILTER } from "@nestjs/core"
+import { BullModule } from "@nestjs/bullmq"
 @Module({
     imports: [
         SentryModule.forRoot(),
         ConfigModule.forRoot({
             isGlobal: true,
             validate: validate,
+        }),
+        BullModule.forRootAsync({
+            inject: [ConfigService],
+            useFactory: async (configService: ConfigService<Env>) => ({
+                connection: {
+                    host: configService.getOrThrow("REDIS_QUEUE_URL"),
+                    maxRetriesPerRequest: null,
+                },
+            }),
         }),
         CompressorModule,
         PrismaModule,
@@ -31,8 +41,8 @@ import { APP_FILTER } from "@nestjs/core"
     providers: [
         {
             provide: APP_FILTER,
-            useClass: SentryGlobalFilter
-        }
+            useClass: SentryGlobalFilter,
+        },
     ],
 })
 export class AppModule {}

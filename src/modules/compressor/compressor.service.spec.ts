@@ -8,6 +8,7 @@ import { CompressorContract } from "./compressor.contract"
 import { RedisSubscriberService } from "../../db/redis.subscriber.service"
 import { Compression } from "../../db/generated/prisma/client"
 import { RequestCompressionDto } from "./dto/request-compression.dto"
+import { CompressionProducer } from "./compression.producer"
 
 function makeRow(overrides: Partial<Compression> = {}): Compression {
     return {
@@ -46,6 +47,9 @@ describe("CompressorService", () => {
     const mockEvents = {
         channel: vi.fn(() => new Subject<string>()),
     }
+    const mockProducer = {
+        enqueue: vi.fn(),
+    }
 
     beforeEach(async () => {
         vi.clearAllMocks()
@@ -60,6 +64,10 @@ describe("CompressorService", () => {
                 {
                     provide: CompressorContract,
                     useValue: mockCompressorRepository,
+                },
+                {
+                    provide: CompressionProducer,
+                    useValue: mockProducer,
                 },
                 {
                     provide: RedisSubscriberService,
