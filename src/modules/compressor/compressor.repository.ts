@@ -2,7 +2,6 @@ import { ConflictException, Injectable } from "@nestjs/common"
 import { CompressorContract } from "./compressor.contract"
 import { PrismaService } from "../../db/prisma.service"
 import { RequestCompressionDto } from "./dto/request-compression.dto"
-import { CompressionStatus } from "../../db/generated/prisma/enums"
 
 @Injectable()
 export class CompressorRepository implements CompressorContract {
@@ -13,6 +12,7 @@ export class CompressorRepository implements CompressorContract {
                 filename: dto.filename,
                 userId: userId,
                 contentType: dto.contentType,
+                preset: dto.preset,
                 sourceKey: sourceKey,
             },
         })

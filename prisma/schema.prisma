@@ -53,6 +53,7 @@ model Compression {
   outputKey   String?
   outputSize  BigInt?
   error       String?
+  preset      Preset            @default(MID)
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
   completedAt DateTime?
@@ -68,6 +69,12 @@ enum CompressionStatus {
   PROCESSING
   COMPLETED
   FAILED
+}
+
+enum Preset {
+  HIGH
+  MID
+  LOW
 }
 
 model Account {

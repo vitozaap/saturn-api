@@ -9,7 +9,7 @@ async function validateDto(payload: unknown) {
 }
 
 describe("RequestCompressionDto", () => {
-    const valid = { filename: "v.mp4", contentType: "video/mp4" }
+    const valid: RequestCompressionDto = { filename: "v.mp4", contentType: "video/mp4", preset: "MID" }
 
     it("Should accept a valid payload", async () => {
         const errors = await validateDto(valid)
@@ -37,5 +37,10 @@ describe("RequestCompressionDto", () => {
         const props = errors.map((e) => e.property)
         expect(props).toContain("filename")
         expect(props).toContain("contentType")
+    })
+    it("Should refuses invalid preset", async () => {
+        const errors = await validateDto({...valid, preset: "INVALID"})
+        expect(errors[0].property).toBe("preset")
+        expect(errors[0].constraints).toHaveProperty("isEnum")
     })
 })
