@@ -36,6 +36,7 @@ describe("CompressorService", () => {
         getUploadUrl: vi.fn(),
         generateSourceKey: vi.fn(),
         getObjectSourceSize: vi.fn(),
+        getDownloadUrl: vi.fn(),
     }
     const mockCompressorRepository = {
         saveCompression: vi.fn().mockResolvedValue({ id: "comp-1" }),
@@ -43,6 +44,7 @@ describe("CompressorService", () => {
         findOwnedById: vi.fn(),
         updateStatusById: vi.fn(),
         findSourceKeyById: vi.fn(),
+        findOutputKeyById: vi.fn(),
     } satisfies CompressorContract
     const mockEvents = {
         channel: vi.fn(() => new Subject<string>()),
@@ -94,6 +96,25 @@ describe("CompressorService", () => {
                 uploadUrl: "https://signed",
                 sourceKey: "tmp/u1/key/v.mp4",
             })
+        })
+    })
+
+    describe("requestDownload", () => {
+        it("Should return a presigned download URL for the compression's outputKey", async () => {
+            mockCompressorRepository.findOutputKeyById.mockResolvedValue({ outputKey: "compressed/u1/comp-1" })
+            mockS3.getDownloadUrl.mockResolvedValue("https://signed-download")
+            const result = await compressorService.requestDownload("u1", { compressionId: "comp-1" })
+            expect(mockCompressorRepository.findOutputKeyById).toHaveBeenCalledWith("u1", "comp-1")
+            expect(mockS3.getDownloadUrl).toHaveBeenCalledWith("compressed/u1/comp-1")
+            expect(result).toBe("https://signed-download")
+        })
+
+        it("Should throw NotFound when the compression is missing, not owned, or not COMPLETED", async () => {
+            mockCompressorRepository.findOutputKeyById.mockResolvedValue(null)
+            await expect(compressorService.requestDownload("u1", { compressionId: "comp-1" })).rejects.toBeInstanceOf(
+                NotFoundException,
+            )
+            expect(mockS3.getDownloadUrl).not.toHaveBeenCalled()
         })
     })
 

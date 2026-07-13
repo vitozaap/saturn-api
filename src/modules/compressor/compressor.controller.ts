@@ -17,12 +17,13 @@ import { CompressorService } from "./compressor.service"
 import { UserSession } from "@thallesp/nestjs-better-auth"
 import { ApiAuthErrors } from "../../common/swagger.decorators"
 import { ConfirmUploadDto } from "./dto/confirm-upload.dto"
+import { RequestDownloadDto } from "./dto/request-download.dto"
 
 @ApiTags("compressor")
 @ApiAuthErrors()
 @Controller("/compressor")
 export class CompressorController {
-    constructor(private readonly service: CompressorService) {}
+    constructor(private readonly service: CompressorService) { }
 
     @Post()
     @ApiOperation({
@@ -44,6 +45,18 @@ export class CompressorController {
     @ApiOkResponse({ type: [CompressionResponseDto] })
     async list(@Session() session: UserSession) {
         return await this.service.listCompressions(session.user.id)
+    }
+        
+    @ApiOperation({
+        summary: "Request a download URL",
+        description: "Returns a presigned S3 URL to download a COMPLETED compression's output file.",
+    })
+    @ApiOkResponse({ type: String, description: "Presigned S3 download URL." })
+    @ApiNotFoundResponse({ description: "Compression not found, not owned by the user, or not COMPLETED yet." })
+    @HttpCode(HttpStatus.OK)
+    @Post("download")
+    async download(@Body() requestDownloadDto: RequestDownloadDto, @Session() session: UserSession) {
+        return await this.service.requestDownload(session.user.id, requestDownloadDto)
     }
 
     @Sse(":id/stream")
