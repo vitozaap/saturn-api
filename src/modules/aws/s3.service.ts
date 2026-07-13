@@ -5,12 +5,13 @@ import {
     HeadObjectCommand,
     GetObjectCommand,
     DeleteObjectsCommand,
-    ObjectIdentifier
+    ObjectIdentifier,
+    ObjectIdentifier$,
 } from "@aws-sdk/client-s3"
 import { ConfigService } from "@nestjs/config"
 import { Env } from "../../config/env"
 import * as Sentry from "@sentry/nestjs"
-import { GetUploadUrlParams } from "./types"
+import { GetUploadUrlParams, Stale } from "./types"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 @Injectable()
 export class S3Service extends S3Client {
@@ -86,12 +87,15 @@ export class S3Service extends S3Client {
         }
     }
 
-    async DeleteMany(objects: ObjectIdentifier[]) {
+    async DeleteMany(stales: Stale[]) {
         try {
+            // Will map to "Key" the sourceKey only if the output is null.
+            // Because it means the compression didnt finish
+            const mapped: ObjectIdentifier[] = stales.map((row) => ({ Key: row.outputKey ?? row.sourceKey }))
             const command = new DeleteObjectsCommand({
                 Bucket: this.bucket,
                 Delete: {
-                    Objects: objects
+                    Objects: mapped
                 }
             })
             const payload = await this.send(command)
@@ -99,7 +103,7 @@ export class S3Service extends S3Client {
                 Sentry.captureMessage(`Failed to delete some objects`, {
                     level: "warning", extra: {
                         failedObjects: payload.Errors,
-                        totalAttempted: objects.length
+                        totalAttempted: mapped.length
                     }
                 })
             }
