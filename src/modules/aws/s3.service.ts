@@ -1,7 +1,8 @@
 import { Injectable } from "@nestjs/common"
-import { PutObjectCommand, S3Client, HeadObjectCommand } from "@aws-sdk/client-s3"
+import { PutObjectCommand, S3Client, HeadObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3"
 import { ConfigService } from "@nestjs/config"
 import { Env } from "../../config/env"
+import * as Sentry from "@sentry/nestjs"
 import { GetUploadUrlParams } from "./types"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 @Injectable()
@@ -62,5 +63,19 @@ export class S3Service extends S3Client {
         }
     }
 
-    // TODO: getDownloadUrl
+    async getDownloadUrl(key: string) {
+        try {
+            const command = new GetObjectCommand({
+                Bucket: this.bucket,
+                Key: key
+            })
+            return await getSignedUrl(this, command, {
+                expiresIn: 3000,
+            })
+        }
+        catch (err) {
+            Sentry.captureMessage(`Failed to generate presigned url: ${err}`)
+            throw err
+        }
+    }
 }

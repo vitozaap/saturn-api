@@ -5,7 +5,7 @@ import { RequestCompressionDto } from "./dto/request-compression.dto"
 
 @Injectable()
 export class CompressorRepository implements CompressorContract {
-    constructor(private readonly prisma: PrismaService) {}
+    constructor(private readonly prisma: PrismaService) { }
     async saveCompression(userId: string, sourceKey: string, dto: RequestCompressionDto) {
         return await this.prisma.compression.create({
             data: {
@@ -16,6 +16,20 @@ export class CompressorRepository implements CompressorContract {
                 sourceKey: sourceKey,
             },
         })
+    }
+    async findOutputKeyById(userId: string, id: string): Promise<{ outputKey: string } | null> {
+        const row = await this.prisma.compression.findFirst({
+            where: {
+                id: id,
+                userId: userId,
+                status: "COMPLETED"
+            },
+            select: {
+                outputKey: true
+            }
+        })
+
+        return !row?.outputKey ? null : { outputKey: row.outputKey }
     }
 
     async findManyByUser(userId: string) {
