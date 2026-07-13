@@ -13,7 +13,8 @@ const schema = z.object({
     MINIO_USER: z.string().nonempty(),
     MINIO_PASSWORD: z.string().nonempty(),
     S3_ENDPOINT: z.url().nonempty(),
-    SENTRY_DSN: z.url().optional()
+    SENTRY_DSN: z.url().optional(),
+    REDIS_QUEUE_URL: z.url().nonempty()
 })
 
 type Env = z.infer<typeof schema>

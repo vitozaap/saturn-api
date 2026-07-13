@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { CompressorController } from "./compressor.controller"
 import { Test } from "@nestjs/testing"
 import { CompressorService } from "./compressor.service"
+import { RequestCompressionDto } from "./dto/request-compression.dto"
 
 describe("CompressorController", () => {
     let compressorController: CompressorController
@@ -33,7 +34,8 @@ describe("CompressorController", () => {
                 contentType: "video/mp4",
                 filename: "v.mp4",
                 userId: "evil-userId",
-            }
+                preset: "MID",
+            } as any // just to fake userId here, typing it here would result in type err
             const session = {
                 user: {
                     id: "userId-from-session",
@@ -43,9 +45,10 @@ describe("CompressorController", () => {
             expect(mockService.requestCompression).toHaveBeenCalledWith("userId-from-session", evilDto)
         })
         it("Should return the same object as service", async () => {
-            const dto = {
+            const dto: RequestCompressionDto = {
                 contentType: "video/mp4",
                 filename: "v.mp4",
+                preset: "MID",
             }
             const session = { user: { id: "userId" } } as any
             const result = await compressorController.requestCompression(dto, session)

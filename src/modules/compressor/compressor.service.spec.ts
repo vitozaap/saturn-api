@@ -7,6 +7,8 @@ import { S3Service } from "../aws/s3.service"
 import { CompressorContract } from "./compressor.contract"
 import { RedisSubscriberService } from "../../db/redis.subscriber.service"
 import { Compression } from "../../db/generated/prisma/client"
+import { RequestCompressionDto } from "./dto/request-compression.dto"
+import { CompressionProducer } from "./compression.producer"
 
 function makeRow(overrides: Partial<Compression> = {}): Compression {
     return {
@@ -19,6 +21,7 @@ function makeRow(overrides: Partial<Compression> = {}): Compression {
         sourceSize: null,
         outputKey: null,
         outputSize: null,
+        preset: "MID",
         error: null,
         createdAt: new Date("2026-01-01"),
         updatedAt: new Date("2026-01-01"),
@@ -44,6 +47,9 @@ describe("CompressorService", () => {
     const mockEvents = {
         channel: vi.fn(() => new Subject<string>()),
     }
+    const mockProducer = {
+        enqueue: vi.fn(),
+    }
 
     beforeEach(async () => {
         vi.clearAllMocks()
@@ -60,6 +66,10 @@ describe("CompressorService", () => {
                     useValue: mockCompressorRepository,
                 },
                 {
+                    provide: CompressionProducer,
+                    useValue: mockProducer,
+                },
+                {
                     provide: RedisSubscriberService,
                     useValue: mockEvents,
                 },
@@ -70,7 +80,7 @@ describe("CompressorService", () => {
 
     describe("requestCompression", () => {
         it("Should generates a key, save the compression into the db and request a upload Url, then returns it", async () => {
-            const dto = { filename: "v.mp4", contentType: "video/mp4" }
+            const dto: RequestCompressionDto = { filename: "v.mp4", contentType: "video/mp4", preset: "MID" }
             mockS3.getUploadUrl.mockResolvedValue("https://signed")
             mockS3.generateSourceKey.mockReturnValue("tmp/u1/key/v.mp4")
             const result = await compressorService.requestCompression("u1", dto)
