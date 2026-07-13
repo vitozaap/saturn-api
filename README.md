@@ -1,4 +1,4 @@
-# Saturn/Squish API 🪐
+# Saturn/Squish API 
 
 > Control plane do **Squish**, um serviço de compressão de vídeo com upload direto pra object storage, fila de jobs e realtime status via SSE (Server-Sent-Events).
 
