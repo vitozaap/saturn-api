@@ -2,6 +2,7 @@ services:
     minio:
         container_name: bucket
         image: quay.io/minio/minio:latest
+        networks: [saturn-net]
         command: server /data --console-address ":9001"
         restart: always
         healthcheck:
@@ -31,24 +32,9 @@ services:
             mc ilm rule add local/${BUCKET} --expire-days 1 --prefix ${UPLOADS_PATH}/ || true;
             exit 0;
             "
-    redis:
-        container_name: queue
-        image: redis:8-alpine
-        # AOF so the BullMQ queue survives a restart. Bound to localhost only —
-        # reachable by the api/worker over the compose network as redis:6379.
-        command: redis-server --appendonly yes
-        restart: always
-        healthcheck:
-            test: ["CMD", "redis-cli", "ping"]
-            interval: 10s
-            timeout: 5s
-            retries: 5
-        ports:
-            - "127.0.0.1:6379:6379"
-        volumes:
-            - redis:/data
     api:
         image: ghcr.io/vitozaap/saturn-api:latest
+        networks: [saturn-net]
         restart: always
         env_file:
             - .env
@@ -57,9 +43,10 @@ services:
         depends_on:
             minio:
                 condition: service_healthy
-            redis:
-                condition: service_healthy
+
+networks:
+    saturn-net:
+        external: true
 
 volumes:
     minio:
-    redis:
