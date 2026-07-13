@@ -6,7 +6,7 @@ import { CompressionStatus } from "../../db/generated/prisma/enums";
 @Injectable()
 export class CleanupRepository implements CleanupContract {
     constructor(private readonly prisma: PrismaService) { }
-    async findExpirableBefore(cutoff: Date, statuses: CompressionStatus[]): Promise<Array<{ id: string, sourceKey: string; }> | null> {
+    async findExpirableBefore(cutoff: Date, statuses: CompressionStatus[]): Promise<Array<{ id: string, sourceKey: string, outputKey: string | null; }> | null> {
         const stale = await this.prisma.compression.findMany({
             where: {
                 status: { in: statuses },
