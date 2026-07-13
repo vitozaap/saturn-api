@@ -69,6 +69,7 @@ enum CompressionStatus {
   PROCESSING
   COMPLETED
   FAILED
+  EXPIRED
 }
 
 enum Preset {
