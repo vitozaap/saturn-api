@@ -22,7 +22,7 @@ import { BullModule } from "@nestjs/bullmq"
             inject: [ConfigService],
             useFactory: async (configService: ConfigService<Env>) => ({
                 connection: {
-                    host: configService.getOrThrow("REDIS_QUEUE_URL"),
+                    url: configService.getOrThrow("REDIS_QUEUE_URL"),
                     maxRetriesPerRequest: null,
                 },
             }),
