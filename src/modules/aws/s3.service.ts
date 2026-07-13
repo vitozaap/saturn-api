@@ -1,5 +1,12 @@
 import { Injectable } from "@nestjs/common"
-import { PutObjectCommand, S3Client, HeadObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3"
+import {
+    PutObjectCommand,
+    S3Client,
+    HeadObjectCommand,
+    GetObjectCommand,
+    DeleteObjectsCommand,
+    ObjectIdentifier
+} from "@aws-sdk/client-s3"
 import { ConfigService } from "@nestjs/config"
 import { Env } from "../../config/env"
 import * as Sentry from "@sentry/nestjs"
@@ -79,17 +86,27 @@ export class S3Service extends S3Client {
         }
     }
 
-    async DeleteObject(key: string) {
+    async DeleteMany(objects: ObjectIdentifier[]) {
         try {
-            const command = new DeleteObjectCommand({
+            const command = new DeleteObjectsCommand({
                 Bucket: this.bucket,
-                Key: key
+                Delete: {
+                    Objects: objects
+                }
             })
-            return await this.send(command)
+            const payload = await this.send(command)
+            if (payload.Errors && payload.Errors.length >= 1) {
+                Sentry.captureMessage(`Failed to delete some objects`, {
+                    level: "warning", extra: {
+                        failedObjects: payload.Errors,
+                        totalAttempted: objects.length
+                    }
+                })
+            }
         }
         catch (err) {
             if (err instanceof Error && (err.name == "NotFound" || err.name == "NoSuchKey")) {
-                Sentry.captureMessage(`Tried to delete an invalid object: ${err.name}`)
+                Sentry.captureMessage(`Failed to complete "delete many" operation: ${err.name}`)
                 return null
             }
             Sentry.captureException(err)
