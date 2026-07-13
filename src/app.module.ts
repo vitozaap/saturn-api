@@ -12,6 +12,7 @@ import { SentryGlobalFilter, SentryModule } from "@sentry/nestjs/setup"
 import { APP_FILTER } from "@nestjs/core"
 import { BullModule } from "@nestjs/bullmq"
 import { ScheduleModule } from "@nestjs/schedule"
+import { CleanupModule } from "./modules/cleanup/cleanup.module"
 @Module({
     imports: [
         SentryModule.forRoot(),
@@ -30,6 +31,7 @@ import { ScheduleModule } from "@nestjs/schedule"
             }),
         }),
         CompressorModule,
+        CleanupModule,
         PrismaModule,
         RedisModule,
         AuthModule.forRootAsync({
