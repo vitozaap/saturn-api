@@ -6,7 +6,6 @@ import {
     GetObjectCommand,
     DeleteObjectsCommand,
     ObjectIdentifier,
-    ObjectIdentifier$,
 } from "@aws-sdk/client-s3"
 import { ConfigService } from "@nestjs/config"
 import { Env } from "../../config/env"

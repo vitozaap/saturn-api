@@ -17,7 +17,8 @@ export class CleanupService {
             Sentry.logger.info("Uncompressed rows older than 5 minutes deleted by cronjob", {
                 affected: stale.length
             })
-            await this.s3.DeleteMany(stale)
+            await this.s3.DeleteMany(stale) 
+            await this.repository.setExpiredRows(stale.map((row) => row.id))
         }
     }
 
@@ -31,6 +32,7 @@ export class CleanupService {
                 affected: stale.length
             })
             await this.s3.DeleteMany(stale)
+            await this.repository.setExpiredRows(stale.map((row) => row.id))
         }
     }
 }
