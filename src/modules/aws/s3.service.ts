@@ -86,32 +86,34 @@ export class S3Service extends S3Client {
         }
     }
 
-    async DeleteMany(stales: Stale[]) {
+    // Batch-deletes the objects behind the given rows and returns the ids whose
+    // object was actually removed, so the caller only marks those rows EXPIRED.
+    // Rows whose key is reported in payload.Errors are left out (retried next sweep).
+    async DeleteMany(stales: Stale[]): Promise<string[]> {
+        if (stales.length === 0) return []
         try {
-            // Will map to "Key" the sourceKey only if the output is null.
-            // Because it means the compression didnt finish
-            const mapped: ObjectIdentifier[] = stales.map((row) => ({ Key: row.outputKey ?? row.sourceKey }))
+            // Use the outputKey when present (finished compression); otherwise the
+            // sourceKey, since an unfinished compression has no output object yet.
+            const items = stales.map((row) => ({ id: row.id, Key: row.outputKey ?? row.sourceKey }))
             const command = new DeleteObjectsCommand({
                 Bucket: this.bucket,
                 Delete: {
-                    Objects: mapped
-                }
+                    Objects: items.map(({ Key }): ObjectIdentifier => ({ Key })),
+                },
             })
             const payload = await this.send(command)
-            if (payload.Errors && payload.Errors.length >= 1) {
+            const failedKeys = new Set((payload.Errors ?? []).map((err) => err.Key))
+            if (failedKeys.size >= 1) {
                 Sentry.captureMessage(`Failed to delete some objects`, {
                     level: "warning", extra: {
                         failedObjects: payload.Errors,
-                        totalAttempted: mapped.length
+                        totalAttempted: items.length
                     }
                 })
             }
+            return items.filter(({ Key }) => !failedKeys.has(Key)).map(({ id }) => id)
         }
         catch (err) {
-            if (err instanceof Error && (err.name == "NotFound" || err.name == "NoSuchKey")) {
-                Sentry.captureMessage(`Failed to complete "delete many" operation: ${err.name}`)
-                return null
-            }
             Sentry.captureException(err)
             throw err
         }
