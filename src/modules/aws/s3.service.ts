@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common"
-import { PutObjectCommand, S3Client, HeadObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3"
+import { PutObjectCommand, S3Client, HeadObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3"
 import { ConfigService } from "@nestjs/config"
 import { Env } from "../../config/env"
 import * as Sentry from "@sentry/nestjs"
@@ -75,6 +75,24 @@ export class S3Service extends S3Client {
         }
         catch (err) {
             Sentry.captureMessage(`Failed to generate presigned url: ${err}`)
+            throw err
+        }
+    }
+
+    async DeleteObject(key: string) {
+        try {
+            const command = new DeleteObjectCommand({
+                Bucket: this.bucket,
+                Key: key
+            })
+            return await this.send(command)
+        }
+        catch (err) {
+            if (err instanceof Error && (err.name == "NotFound" || err.name == "NoSuchKey")) {
+                Sentry.captureMessage(`Tried to delete an invalid object: ${err.name}`)
+                return null
+            }
+            Sentry.captureException(err)
             throw err
         }
     }
