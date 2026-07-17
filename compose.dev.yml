@@ -2,6 +2,7 @@ services:
   db:
     container_name: db
     image: postgres:18.4-alpine
+    networks: [saturn-net]
     env_file:
       - .env.local
     environment:
@@ -21,6 +22,7 @@ services:
   minio:
     container_name: bucket
     image: quay.io/minio/minio:latest
+    networks: [saturn-net]
     command: server /data --console-address ":9001"
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
@@ -40,6 +42,7 @@ services:
   
   createbucket:
     image: quay.io/minio/mc:latest
+    networks: [saturn-net]
     container_name: minio-client
     depends_on:
       minio:
@@ -54,6 +57,7 @@ services:
   # BullMQ queue (API producer + worker consumer). AOF so jobs survive a restart.
   redis-queue:
     container_name: redis-queue
+    networks: [saturn-net]
     image: redis:8-alpine
     command: redis-server --appendonly yes
     healthcheck:
@@ -70,6 +74,7 @@ services:
   # pub/sub messages are fire-and-forget, so no persistence needed.
   redis-status:
     container_name: redis-status
+    networks: [saturn-net]
     image: redis:8-alpine
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -81,6 +86,7 @@ services:
 
   app:
     container_name: api
+    networks: [saturn-net]
     build:
       context: .
       dockerfile: Dockerfile.dev
@@ -102,3 +108,7 @@ volumes:
   postgres:
   minio:
   redis-queue:
+
+networks:
+    saturn-net:
+        external: true
