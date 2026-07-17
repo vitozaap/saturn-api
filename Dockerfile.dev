@@ -1,0 +1,26 @@
+FROM node:24-alpine AS deps
+WORKDIR /deps
+COPY ./package*.json ./
+RUN npm ci
+
+
+FROM node:24-alpine AS builder
+WORKDIR /builder
+COPY --from=deps /deps/node_modules ./node_modules
+COPY . .
+
+RUN npx prisma generate
+RUN npm run build
+
+
+FROM node:24-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=development
+COPY --from=builder /builder/node_modules ./node_modules
+COPY --from=builder /builder/package*.json /builder/prisma.config.ts ./
+COPY --from=builder /builder/prisma ./prisma
+COPY --from=builder /builder/src/db/generated ./src/db/generated
+COPY --from=builder /builder/dist ./dist
+
+USER node
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]

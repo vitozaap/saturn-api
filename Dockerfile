@@ -10,7 +10,6 @@ WORKDIR /build
 COPY --from=deps /deps/node_modules ./node_modules
 COPY . .
 
-# prisma.config.ts falls back to a dummy URL, so generate needs no DATABASE_URL.
 RUN npx prisma generate
 RUN npm run build
 # Strip devDeps 
