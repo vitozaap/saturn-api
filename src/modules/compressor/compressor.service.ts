@@ -36,7 +36,7 @@ export class CompressorService {
     async requestDownload(userId: string, dto: RequestDownloadDto) {
         const key = await this.repository.findOutputKeyById(userId, dto.compressionId)
         if (!key) throw new NotFoundException()
-        return await this.s3.getDownloadUrl(key.outputKey)
+        return await this.s3.getDownloadUrl(key.outputKey, key.filename)
     }
 
     async listCompressions(userId: string) {
