@@ -101,11 +101,14 @@ describe("CompressorService", () => {
 
     describe("requestDownload", () => {
         it("Should return a presigned download URL for the compression's outputKey", async () => {
-            mockCompressorRepository.findOutputKeyById.mockResolvedValue({ outputKey: "compressed/u1/comp-1" })
+            mockCompressorRepository.findOutputKeyById.mockResolvedValue({
+                outputKey: "compressed/u1/comp-1",
+                filename: "vídeo final.mp4",
+            })
             mockS3.getDownloadUrl.mockResolvedValue("https://signed-download")
             const result = await compressorService.requestDownload("u1", { compressionId: "comp-1" })
             expect(mockCompressorRepository.findOutputKeyById).toHaveBeenCalledWith("u1", "comp-1")
-            expect(mockS3.getDownloadUrl).toHaveBeenCalledWith("compressed/u1/comp-1")
+            expect(mockS3.getDownloadUrl).toHaveBeenCalledWith("compressed/u1/comp-1", "vídeo final.mp4")
             expect(result).toBe("https://signed-download")
         })
 
