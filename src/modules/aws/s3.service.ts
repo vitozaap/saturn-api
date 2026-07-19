@@ -70,11 +70,16 @@ export class S3Service extends S3Client {
         }
     }
 
-    async getDownloadUrl(key: string) {
+    async getDownloadUrl(key: string, filename: string) {
         try {
             const command = new GetObjectCommand({
                 Bucket: this.bucket,
-                Key: key
+                Key: key,
+                // Without this the object is served as video/mp4 and the browser
+                // plays it inline instead of downloading. The `download` attribute
+                // on an <a> cannot fix it either: it is ignored cross-origin.
+                // RFC 5987 encoding, since filenames are often accented (pt-BR).
+                ResponseContentDisposition: `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
             })
             return await getSignedUrl(this, command, {
                 expiresIn: 3000,

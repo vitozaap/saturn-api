@@ -16,6 +16,9 @@ export const AuthConfigService = {
             plugins: [anonymous(), openAPI({ disableDefaultReference: true })],
             trustedOrigins: [config.getOrThrow("WEB_URL")],
             secret: config.getOrThrow("BETTER_AUTH_SECRET"),
+            advanced: {
+                cookiePrefix: "squish",
+            },
             database: prismaAdapter(prisma, {
                 provider: 'postgresql'
             })

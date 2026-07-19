@@ -17,7 +17,7 @@ export class CompressorRepository implements CompressorContract {
             },
         })
     }
-    async findOutputKeyById(userId: string, id: string): Promise<{ outputKey: string } | null> {
+    async findOutputKeyById(userId: string, id: string): Promise<{ outputKey: string; filename: string } | null> {
         const row = await this.prisma.compression.findFirst({
             where: {
                 id: id,
@@ -25,11 +25,12 @@ export class CompressorRepository implements CompressorContract {
                 status: "COMPLETED"
             },
             select: {
-                outputKey: true
+                outputKey: true,
+                filename: true
             }
         })
 
-        return !row?.outputKey ? null : { outputKey: row.outputKey }
+        return !row?.outputKey ? null : { outputKey: row.outputKey, filename: row.filename }
     }
 
     async findManyByUser(userId: string) {
