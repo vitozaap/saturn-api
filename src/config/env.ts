@@ -14,7 +14,11 @@ const schema = z.object({
     MINIO_PASSWORD: z.string().nonempty(),
     S3_ENDPOINT: z.url().nonempty(),
     SENTRY_DSN: z.url().optional(),
-    REDIS_QUEUE_URL: z.url().nonempty()
+    REDIS_QUEUE_URL: z.url().nonempty(),
+    // Presigned URL lifetimes (seconds). Kept short so a leaked URL is only
+    // usable briefly. Download is single-shot, so it can be tighter than upload.
+    PRESIGN_DOWNLOAD_TTL: z.coerce.number().int().positive().default(300),
+    PRESIGN_UPLOAD_TTL: z.coerce.number().int().positive().default(900),
 })
 
 type Env = z.infer<typeof schema>

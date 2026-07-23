@@ -15,6 +15,8 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 @Injectable()
 export class S3Service extends S3Client {
     private readonly bucket: string
+    private readonly downloadTtl: number
+    private readonly uploadTtl: number
     constructor(private readonly configService: ConfigService<Env>) {
         super({
             // Using minIO as default bucket
@@ -27,6 +29,8 @@ export class S3Service extends S3Client {
             region: "sa-east-1",
         })
         this.bucket = this.configService.getOrThrow("BUCKET")
+        this.downloadTtl = this.configService.getOrThrow("PRESIGN_DOWNLOAD_TTL")
+        this.uploadTtl = this.configService.getOrThrow("PRESIGN_UPLOAD_TTL")
     }
 
     safeName(filename: string) {
@@ -49,6 +53,7 @@ export class S3Service extends S3Client {
         // when the PUT's Content-Type differs from the one signed here.
         return await getSignedUrl(this, command, {
             signableHeaders: new Set(["content-type"]),
+            expiresIn: this.uploadTtl,
         })
     }
 
@@ -82,7 +87,7 @@ export class S3Service extends S3Client {
                 ResponseContentDisposition: `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
             })
             return await getSignedUrl(this, command, {
-                expiresIn: 3000,
+                expiresIn: this.downloadTtl,
             })
         }
         catch (err) {
