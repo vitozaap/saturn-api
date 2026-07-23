@@ -17,20 +17,41 @@ export class S3Service extends S3Client {
     private readonly bucket: string
     private readonly downloadTtl: number
     private readonly uploadTtl: number
+    // Client used only to sign presigned URLs. They go to the browser, which
+    // can't resolve the compose service name the server talks to (minio:9000),
+    // so in dev they are signed against a host-reachable endpoint
+    // (S3_PUBLIC_ENDPOINT, e.g. localhost:9000). In prod both share the one
+    // public endpoint, so it reuses the base client.
+    private readonly presignClient: S3Client
     constructor(private readonly configService: ConfigService<Env>) {
+        const credentials = {
+            accessKeyId: configService.getOrThrow("MINIO_USER"),
+            secretAccessKey: configService.getOrThrow("MINIO_PASSWORD"),
+        }
         super({
             // Using minIO as default bucket
-            credentials: {
-                accessKeyId: configService.getOrThrow("MINIO_USER"),
-                secretAccessKey: configService.getOrThrow("MINIO_PASSWORD"),
-            },
+            credentials,
             endpoint: configService.getOrThrow("S3_ENDPOINT"),
             forcePathStyle: true,
             region: "sa-east-1",
+            // Don't bake an x-amz-checksum-crc32 placeholder into presigned URLs
+            // (prod presigns with this base client): the browser PUT can't
+            // recompute it, so MinIO rejects the mismatch with 403.
+            requestChecksumCalculation: "WHEN_REQUIRED",
         })
         this.bucket = this.configService.getOrThrow("BUCKET")
         this.downloadTtl = this.configService.getOrThrow("PRESIGN_DOWNLOAD_TTL")
         this.uploadTtl = this.configService.getOrThrow("PRESIGN_UPLOAD_TTL")
+        this.presignClient =
+            this.configService.getOrThrow("NODE_ENV") === "production"
+                ? this
+                : new S3Client({
+                      credentials,
+                      endpoint: this.configService.getOrThrow("S3_PUBLIC_ENDPOINT"),
+                      forcePathStyle: true,
+                      region: "sa-east-1",
+                      requestChecksumCalculation: "WHEN_REQUIRED",
+                  })
     }
 
     safeName(filename: string) {
@@ -51,7 +72,7 @@ export class S3Service extends S3Client {
         })
         // Force content-type into the signature so S3 rejects the upload
         // when the PUT's Content-Type differs from the one signed here.
-        return await getSignedUrl(this, command, {
+        return await getSignedUrl(this.presignClient, command, {
             signableHeaders: new Set(["content-type"]),
             expiresIn: this.uploadTtl,
         })
@@ -86,7 +107,7 @@ export class S3Service extends S3Client {
                 // RFC 5987 encoding, since filenames are often accented (pt-BR).
                 ResponseContentDisposition: `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
             })
-            return await getSignedUrl(this, command, {
+            return await getSignedUrl(this.presignClient, command, {
                 expiresIn: this.downloadTtl,
             })
         }
