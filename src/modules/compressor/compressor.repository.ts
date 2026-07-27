@@ -1,7 +1,9 @@
-import { ConflictException, Injectable } from "@nestjs/common"
+import { ConflictException, Injectable, NotFoundException } from "@nestjs/common"
 import { CompressorContract } from "./compressor.contract"
 import { PrismaService } from "../../db/prisma.service"
 import { RequestCompressionDto } from "./dto/request-compression.dto"
+import { PrismaClientKnownRequestError } from "../../db/generated/prisma/internal/prismaNamespace"
+
 
 @Injectable()
 export class CompressorRepository implements CompressorContract {
@@ -17,6 +19,32 @@ export class CompressorRepository implements CompressorContract {
             },
         })
     }
+    async findKeysById(userId: string, id: string) {
+        return await this.prisma.compression.findFirst({
+            where: { id: id, userId: userId },
+            select: { sourceKey: true, outputKey: true, status: true },
+        })
+    }
+
+    async deleteCompression(userId: string, id: string): Promise<void> {
+        try {
+            await this.prisma.compression.delete({
+                // Only deletes if the workers isnt with the compression
+                where: {
+                    id: id,
+                    userId: userId,
+                    status: { in: ["PENDING_UPLOAD", "COMPLETED", "FAILED", "EXPIRED"] },
+                },
+            })
+        } catch (err) {
+            // P2025: no row matched the filters. Already deleted, foreign, etc
+            if (err instanceof PrismaClientKnownRequestError && err.code === "P2025") {
+                throw new NotFoundException()
+            }
+            throw err
+        }
+    }
+
     async findOutputKeyById(userId: string, id: string): Promise<{ outputKey: string; filename: string } | null> {
         const row = await this.prisma.compression.findFirst({
             where: {

@@ -24,7 +24,7 @@ export class CleanupService {
         if (stale.length === 0) return
         // Only mark rows whose object was actually removed; if S3 throws, nothing is
         // marked and the same rows are retried on the next sweep.
-        const deletedIds = await this.s3.DeleteMany(stale)
+        const deletedIds = await this.s3.deleteMany(stale)
         await this.repository.setExpiredRows(deletedIds)
     }
 
@@ -42,7 +42,7 @@ export class CleanupService {
         const cutoff = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000)
         const stale = await this.repository.findExpirableBefore(cutoff, ["COMPLETED"], "completedAt")
         if (stale.length === 0) return
-        const deletedIds = await this.s3.DeleteMany(stale)
+        const deletedIds = await this.s3.deleteMany(stale)
         await this.repository.setExpiredRows(deletedIds)
     }
 }

@@ -1,4 +1,4 @@
-import { Injectable, MessageEvent, NotFoundException } from "@nestjs/common"
+import { ConflictException, Injectable, MessageEvent, NotFoundException } from "@nestjs/common"
 import { distinctUntilChanged, filter, from, map, merge, Observable, switchMap, takeWhile, timer } from "rxjs"
 import { S3Service } from "../aws/s3.service"
 import { RedisSubscriberService } from "../../db/redis.subscriber.service"
@@ -31,6 +31,18 @@ export class CompressorService {
             uploadUrl,
             sourceKey,
         }
+    }
+
+    async deleteCompression(userId: string, id: string): Promise<void> {
+        // Will delete first from bucket and if success, will proceed to delete it from database
+        const row = await this.repository.findKeysById(userId, id)
+        if (!row) throw new NotFoundException()
+        if (row.status === "QUEUED" || row.status === "PROCESSING") {
+            throw new ConflictException("Compression is being processed")
+        }
+        // Filters all null keys from row
+        await this.s3.deleteKeys([row.sourceKey, row.outputKey].filter((key) => key !== null))
+        await this.repository.deleteCompression(userId, id)
     }
 
     async requestDownload(userId: string, dto: RequestDownloadDto) {

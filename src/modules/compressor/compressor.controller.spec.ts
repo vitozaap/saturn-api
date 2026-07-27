@@ -13,6 +13,7 @@ describe("CompressorController", () => {
             sourceKey: "tmp/u1/comp-1/v.mp4",
         }),
         confirmUpload: vi.fn().mockResolvedValue(null),
+        deleteCompression: vi.fn().mockResolvedValue(undefined),
     }
     beforeEach(async () => {
         vi.clearAllMocks()
@@ -72,6 +73,17 @@ describe("CompressorController", () => {
             } as any
             await compressorController.confirmUpload(evilDto, session)
             expect(mockService.confirmUpload).toHaveBeenCalledWith("userId-session", evilDto)
+        })
+    })
+
+    describe("deleteCompression", () => {
+        it("Should pass the id from the route and the userId from the session", async () => {
+            const session = { user: { id: "userId-session" } } as any
+            await compressorController.deleteCompression("018f8a1e-7b2c-7000-8000-1c2d3e4f5a6b", session)
+            expect(mockService.deleteCompression).toHaveBeenCalledWith(
+                "userId-session",
+                "018f8a1e-7b2c-7000-8000-1c2d3e4f5a6b",
+            )
         })
     })
 })
