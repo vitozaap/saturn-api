@@ -1,8 +1,9 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, MessageEvent, Param, Post, Session, Sse } from "@nestjs/common"
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, MessageEvent, Param, Post, Session, Sse } from "@nestjs/common"
 import {
     ApiBadRequestResponse,
     ApiConflictResponse,
     ApiCreatedResponse,
+    ApiNoContentResponse,
     ApiNotFoundResponse,
     ApiOkResponse,
     ApiOperation,
@@ -46,7 +47,7 @@ export class CompressorController {
     async list(@Session() session: UserSession) {
         return await this.service.listCompressions(session.user.id)
     }
-        
+
     @ApiOperation({
         summary: "Request a download URL",
         description: "Returns a presigned S3 URL to download a COMPLETED compression's output file.",
@@ -86,5 +87,19 @@ export class CompressorController {
     @Post("confirm-upload")
     async confirmUpload(@Body() confirmUploadDto: ConfirmUploadDto, @Session() session: UserSession) {
         return await this.service.confirmUpload(session.user.id, confirmUploadDto)
+    }
+
+    @ApiOperation({
+        summary: "Delete a compression",
+        description: "Deletes a single compression based on its ID and user ID"
+    })
+    @ApiNoContentResponse({ description: "Compression successfully deleted." })
+    @ApiNotFoundResponse({ description: "Compression ID or UserId not found." })
+    @ApiConflictResponse({ description: "Compression is QUEUED or PROCESSING." })
+    @ApiParam({ name: "id", format: "uuid", description: "Compression id." })
+    @HttpCode(HttpStatus.NO_CONTENT)
+    @Delete(":id")
+    async deleteCompression(@Param("id") id: string, @Session() session: UserSession) {
+        return await this.service.deleteCompression(session.user.id, id)
     }
 }

@@ -46,12 +46,12 @@ export class S3Service extends S3Client {
             this.configService.getOrThrow("NODE_ENV") === "production"
                 ? this
                 : new S3Client({
-                      credentials,
-                      endpoint: this.configService.getOrThrow("S3_PUBLIC_ENDPOINT"),
-                      forcePathStyle: true,
-                      region: "sa-east-1",
-                      requestChecksumCalculation: "WHEN_REQUIRED",
-                  })
+                    credentials,
+                    endpoint: this.configService.getOrThrow("S3_PUBLIC_ENDPOINT"),
+                    forcePathStyle: true,
+                    region: "sa-east-1",
+                    requestChecksumCalculation: "WHEN_REQUIRED",
+                })
     }
 
     safeName(filename: string) {
@@ -117,32 +117,47 @@ export class S3Service extends S3Client {
         }
     }
 
-    // Batch-deletes the objects behind the given rows and returns the ids whose
-    // object was actually removed, so the caller only marks those rows EXPIRED.
-    // Rows whose key is reported in payload.Errors are left out (retried next sweep).
-    async DeleteMany(stales: Stale[]): Promise<string[]> {
+    async deleteMany(stales: Stale[]): Promise<string[]> {
         if (stales.length === 0) return []
+        // Use the outputKey when present, otherwise use the
+        // sourceKey, since an unfinished compression has no output.
+        const items = stales.map((row) => ({ id: row.id, Key: row.outputKey ?? row.sourceKey }))
+        const failedKeys = await this.sendDelete(items.map(({ Key }) => Key))
+        // First will get only the s3 objects that were delete !failedKeys.has(Key). 
+        // After will map to get only the IDs so the cleanup can use them to update statuses .map(({id}) => id)
+        return items.filter(({ Key }) => !failedKeys.has(Key)).map(({ id }) => id)
+    }
+
+
+    async deleteKeys(keys: string[]): Promise<void> {
+        const failedKeys = await this.sendDelete(keys)
+        if (failedKeys.size >= 1) {
+            throw new Error(`Failed to delete ${failedKeys.size} object(s) from S3`)
+        }
+    }
+
+    // Returns the subset of keys S3 refused to delete.
+    private async sendDelete(keys: string[]): Promise<Set<string | undefined>> {
+        if (keys.length === 0) return new Set()
         try {
-            // Use the outputKey when present (finished compression); otherwise the
-            // sourceKey, since an unfinished compression has no output object yet.
-            const items = stales.map((row) => ({ id: row.id, Key: row.outputKey ?? row.sourceKey }))
             const command = new DeleteObjectsCommand({
                 Bucket: this.bucket,
                 Delete: {
-                    Objects: items.map(({ Key }): ObjectIdentifier => ({ Key })),
+                    Objects: keys.map((Key): ObjectIdentifier => ({ Key })),
                 },
             })
             const payload = await this.send(command)
+            // Creates a new Set with only the failed keys. Running through payload.Errors and mapping to get only the keys
             const failedKeys = new Set((payload.Errors ?? []).map((err) => err.Key))
             if (failedKeys.size >= 1) {
                 Sentry.captureMessage(`Failed to delete some objects`, {
                     level: "warning", extra: {
                         failedObjects: payload.Errors,
-                        totalAttempted: items.length
+                        totalAttempted: keys.length
                     }
                 })
             }
-            return items.filter(({ Key }) => !failedKeys.has(Key)).map(({ id }) => id)
+            return failedKeys
         }
         catch (err) {
             Sentry.captureException(err)

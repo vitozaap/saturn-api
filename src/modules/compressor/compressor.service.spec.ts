@@ -1,6 +1,6 @@
 import { beforeEach, describe, vi, it, expect } from "vitest"
 import { firstValueFrom, Subject, toArray } from "rxjs"
-import { NotFoundException } from "@nestjs/common"
+import { ConflictException, NotFoundException } from "@nestjs/common"
 import { CompressorService } from "./compressor.service"
 import { Test } from "@nestjs/testing"
 import { S3Service } from "../aws/s3.service"
@@ -37,9 +37,12 @@ describe("CompressorService", () => {
         generateSourceKey: vi.fn(),
         getObjectSourceSize: vi.fn(),
         getDownloadUrl: vi.fn(),
+        deleteKeys: vi.fn(),
     }
     const mockCompressorRepository = {
         saveCompression: vi.fn().mockResolvedValue({ id: "comp-1" }),
+        deleteCompression: vi.fn(),
+        findKeysById: vi.fn(),
         findManyByUser: vi.fn(),
         findOwnedById: vi.fn(),
         updateStatusById: vi.fn(),
@@ -96,6 +99,50 @@ describe("CompressorService", () => {
                 uploadUrl: "https://signed",
                 sourceKey: "tmp/u1/key/v.mp4",
             })
+        })
+    })
+
+    describe("deleteCompression", () => {
+        it("Should throw NotFound when the compression is missing or not owned", async () => {
+            mockCompressorRepository.findKeysById.mockResolvedValue(null)
+            await expect(compressorService.deleteCompression("u1", "comp-1")).rejects.toBeInstanceOf(NotFoundException)
+            expect(mockS3.deleteKeys).not.toHaveBeenCalled()
+            expect(mockCompressorRepository.deleteCompression).not.toHaveBeenCalled()
+        })
+
+        it("Should throw Conflict while the worker still owns the row", async () => {
+            for (const status of ["QUEUED", "PROCESSING"] as const) {
+                mockCompressorRepository.findKeysById.mockResolvedValue(
+                    makeRow({ status, outputKey: "compressed/u1/comp-1" }),
+                )
+                await expect(compressorService.deleteCompression("u1", "comp-1")).rejects.toBeInstanceOf(
+                    ConflictException,
+                )
+            }
+            expect(mockS3.deleteKeys).not.toHaveBeenCalled()
+            expect(mockCompressorRepository.deleteCompression).not.toHaveBeenCalled()
+        })
+
+        it("Should delete both the source and the output object of a COMPLETED compression", async () => {
+            mockCompressorRepository.findKeysById.mockResolvedValue(
+                makeRow({ status: "COMPLETED", outputKey: "compressed/u1/comp-1" }),
+            )
+            await compressorService.deleteCompression("u1", "comp-1")
+            expect(mockS3.deleteKeys).toHaveBeenCalledWith(["uploads/u1/k/v.mp4", "compressed/u1/comp-1"])
+            expect(mockCompressorRepository.deleteCompression).toHaveBeenCalledWith("u1", "comp-1")
+        })
+
+        it("Should delete only the source when there is no output yet", async () => {
+            mockCompressorRepository.findKeysById.mockResolvedValue(makeRow({ status: "PENDING_UPLOAD" }))
+            await compressorService.deleteCompression("u1", "comp-1")
+            expect(mockS3.deleteKeys).toHaveBeenCalledWith(["uploads/u1/k/v.mp4"])
+        })
+
+        it("Should keep the row when S3 refuses the delete, so the user can retry", async () => {
+            mockCompressorRepository.findKeysById.mockResolvedValue(makeRow({ status: "FAILED" }))
+            mockS3.deleteKeys.mockRejectedValue(new Error("S3 down"))
+            await expect(compressorService.deleteCompression("u1", "comp-1")).rejects.toThrow("S3 down")
+            expect(mockCompressorRepository.deleteCompression).not.toHaveBeenCalled()
         })
     })
 
