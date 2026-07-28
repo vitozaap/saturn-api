@@ -22,6 +22,7 @@ services:
     createbucket:
         image: quay.io/minio/mc:latest
         container_name: minio-client
+        networks: [saturn-net]
         depends_on:
             minio:
                 condition: service_healthy
