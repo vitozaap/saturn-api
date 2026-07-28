@@ -3,6 +3,8 @@ import { RequestCompressionDto } from "./dto/request-compression.dto"
 
 export abstract class CompressorContract {
     abstract saveCompression(userId: string, sourceKey: string, dto: RequestCompressionDto): Promise<{ id: string }>
+    abstract deleteCompression(userId: string, id: string): Promise<void>
+    abstract findKeysById(userId: string, id: string): Promise<Pick<Compression, "sourceKey" | "outputKey" | "status"> | null>
     abstract findManyByUser(userId: string): Promise<Compression[]>
     abstract findOwnedById(userId: string, id: string): Promise<Compression | null>
     abstract findSourceKeyById(userId: string, id: string): Promise<{ sourceKey: string } | null>
