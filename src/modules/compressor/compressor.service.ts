@@ -1,6 +1,6 @@
 import { ConflictException, Injectable, MessageEvent, NotFoundException } from "@nestjs/common"
 import { distinctUntilChanged, filter, from, map, merge, Observable, switchMap, takeWhile, timer } from "rxjs"
-import { S3Service } from "../aws/s3.service"
+import { S3Service } from "../cloud/s3.service"
 import { RedisSubscriberService } from "../../db/redis.subscriber.service"
 import { CompressorContract } from "./compressor.contract"
 import { RequestCompressionDto } from "./dto/request-compression.dto"
