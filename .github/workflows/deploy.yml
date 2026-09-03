@@ -85,6 +85,15 @@ jobs:
                   source: compose.queue.yml
                   target: ~/saturn-queue
 
+            - name: Copy proxy files into VPS over SSH
+              uses: appleboy/scp-action@v1
+              with:
+                  host: ${{ secrets.VPS_HOST }}
+                  username: ${{ secrets.VPS_USER }}
+                  key: ${{ secrets.VPS_SSH_KEY }}
+                  source: "compose.proxy.yml,Caddyfile"
+                  target: ~/saturn-proxy
+
             - name: Deploy over SSH
               uses: appleboy/ssh-action@v1
               env:
@@ -105,5 +114,8 @@ jobs:
                       chmod 600 .env
                       docker compose -f compose.prod.yml pull
                       docker compose -f compose.prod.yml up -d
+                      cd ~/saturn-proxy
+                      docker compose -f compose.proxy.yml pull
+                      docker compose -f compose.proxy.yml up -d
                       docker image prune -f
                       docker logout ghcr.io

@@ -1,0 +1,30 @@
+services:
+    caddy:
+        image: caddy:2-alpine
+        container_name: proxy
+        restart: always
+        # Joins saturn-net so it reaches api:3000 and minio:9000 by service name.
+        # Those two stay bound to 127.0.0.1 on the host — Caddy is the only
+        # container publishing a public port.
+        networks: [saturn-net]
+        ports:
+            - "80:80"
+            - "443:443"
+        volumes:
+            - ./Caddyfile:/etc/caddy/Caddyfile:ro
+            # /data holds the issued certificates AND the ACME account key.
+            # It must be a named volume: on a bind mount to a fresh directory,
+            # or if this volume is ever dropped, Caddy re-issues from scratch,
+            # and re-issues count against Let's Encrypt's 50-certs-per-domain
+            # weekly limit. `docker compose down -v` WOULD drop it — never use
+            # -v on this stack.
+            - caddy-data:/data
+            - caddy-config:/config
+
+networks:
+    saturn-net:
+        external: true
+
+volumes:
+    caddy-data:
+    caddy-config:
