@@ -1,5 +1,5 @@
 import { CompressionStatus } from "../../db/generated/prisma/enums";
-import { Stale } from "../aws/types";
+import { Stale } from "../cloud/types";
 
 
 export type ExpirableDateField = "createdAt" | "completedAt"

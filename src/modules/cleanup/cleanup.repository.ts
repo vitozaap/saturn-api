@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { CleanupContract, ExpirableDateField } from "./cleanup.contract";
 import { PrismaService } from "../../db/prisma.service";
 import { CompressionStatus } from "../../db/generated/prisma/enums";
-import { Stale } from "../aws/types";
+import { Stale } from "../cloud/types";
 
 @Injectable()
 export class CleanupRepository implements CleanupContract {

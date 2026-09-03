@@ -3,12 +3,12 @@ import "reflect-metadata"
 import "dotenv/config"
 
 import { NestFactory } from "@nestjs/core"
-
 import { AppModule } from "./app.module"
 import { Logger, ValidationPipe } from "@nestjs/common"
 import { env } from "./config/env"
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger"
 import { apiReference } from "@scalar/nestjs-api-reference"
+
 async function bootstrap() {
     const app = await NestFactory.create(AppModule, {
         bodyParser: false,

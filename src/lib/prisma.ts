@@ -10,7 +10,7 @@ if (!databaseUrl) {
     throw new Error("DATABASE_URL is required")
 }
 
-const ssl = env.NODE_ENV == "production" ? { rejectUnauthorized: true } : undefined;
+const ssl = env.NODE_ENV === "production" ? { rejectUnauthorized: true } : undefined;
 const adapter = new PrismaPg({
     connectionString: databaseUrl,
     ssl
