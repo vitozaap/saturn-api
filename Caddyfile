@@ -1,0 +1,43 @@
+# Reverse proxy + automatic TLS for the Squish API and object storage.
+#
+# Caddy provisions and renews Let's Encrypt certificates on its own: no certbot,
+# no cron, no renewal hook. It needs ports 80 and 443 reachable from the
+# internet (80 for the HTTP-01 challenge and the HTTP->HTTPS redirect) and the
+# A records already pointing here.
+#
+# Add `email you@squish.digital` in a global block above to receive Let's
+# Encrypt expiry notices; Caddy issues fine without it.
+
+api.squish.digital {
+	# The SSE status stream must reach the browser as each event is written,
+	# not when the stream closes. Caddy already detects `text/event-stream` and
+	# flushes immediately, but the route is spelled out because a silent
+	# regression here looks like "compressions never leave PROCESSING" in the
+	# UI rather than like a proxy bug.
+	@sse path_regexp ^/compressor/[^/]+/stream$
+	handle @sse {
+		reverse_proxy api:3000 {
+			flush_interval -1
+		}
+	}
+
+	handle {
+		reverse_proxy api:3000
+	}
+}
+
+storage.squish.digital {
+	# No `encode` on this host: the bodies are already-compressed video, so
+	# gzip would burn CPU for nothing on a box that also runs ffmpeg.
+	#
+	# No request body limit either. Caddy has no default cap — unlike nginx,
+	# whose 1 MB `client_max_body_size` is the classic reason presigned PUTs
+	# of large videos fail with 413.
+	#
+	# The upstream Host header is passed through unchanged, which is required
+	# and not the default in every proxy: MinIO validates the SigV4 presigned
+	# signature against Host, and the API signs those URLs for
+	# storage.squish.digital. Rewriting it to minio:9000 would 403 every upload
+	# and every download.
+	reverse_proxy minio:9000
+}

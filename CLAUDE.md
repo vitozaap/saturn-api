@@ -71,7 +71,8 @@ A single `Compression` model owns the full lifecycle (source → job → output)
 - `src/modules/cloud/s3.service.ts` — S3 client + presigned URLs (MinIO endpoint)
 - `src/db/` — Prisma service, Redis subscriber (SSE wake), generated client
 - `src/config/` — zod env (`env.ts`), better-auth config
-- `compose.dev.yml` / `compose.prod.yml` / `compose.queue.yml` — local infra / prod API+MinIO / queue Redis. Prod composes join the external Docker network `saturn-net`, shared with the worker.
+- `compose.dev.yml` / `compose.prod.yml` / `compose.queue.yml` / `compose.proxy.yml` — local infra / prod API+MinIO / queue Redis / Caddy. Prod composes join the external Docker network `saturn-net`, shared with the worker.
+- `Caddyfile` — reverse proxy and automatic TLS for `api.squish.digital` and `storage.squish.digital`. Caddy issues and renews Let's Encrypt certs itself; there is no certbot and no renewal cron. It is the only container publishing a public port — API and MinIO stay on `127.0.0.1`. Certs live in the `caddy-data` volume, so **never** `docker compose down -v` this stack: re-issuing counts against Let's Encrypt's weekly limit.
 
 ## Common commands
 
