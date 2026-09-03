@@ -3,14 +3,14 @@ import { CompressorController } from "./compressor.controller"
 import { CompressorService } from "./compressor.service"
 import { CompressorContract } from "./compressor.contract"
 import { CompressorRepository } from "./compressor.repository"
-import { AwsModule } from "../aws/aws.module"
+import { S3Module } from "../cloud/s3.module"
 import { BullModule } from "@nestjs/bullmq"
 import { COMPRESSIONS_QUEUE } from "./compressor.queue"
 import { CompressionProducer } from "./compression.producer"
 
 @Module({
     imports: [
-        AwsModule,
+        S3Module,
         BullModule.registerQueue({
             name: COMPRESSIONS_QUEUE,
         }),

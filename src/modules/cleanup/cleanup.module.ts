@@ -1,13 +1,12 @@
 import { Module } from "@nestjs/common";
-import { AwsModule } from "../aws/aws.module";
-import { PrismaModule } from "../../db/prisma.module";
+import { S3Module } from "../cloud/s3.module";
 import { CleanupService } from "./cleanup.service";
 import { CleanupContract } from "./cleanup.contract";
 import { CleanupRepository } from "./cleanup.repository";
 
 
 @Module({
-    imports: [AwsModule],
+    imports: [S3Module],
     providers: [CleanupService,
         {
             provide: CleanupContract,

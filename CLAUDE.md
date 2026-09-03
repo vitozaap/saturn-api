@@ -37,8 +37,10 @@ Everything runs on a single ARM VPS (Oracle Cloud) via Docker Compose: this API,
 
 `PENDING_UPLOAD → QUEUED → PROCESSING → COMPLETED | FAILED`, plus **`EXPIRED`** set by the cleanup crons (`src/modules/cleanup/`):
 
-- every minute: `PENDING_UPLOAD`/`FAILED` older than 5 min → delete object, mark `EXPIRED`
-- daily at midnight: `COMPLETED` older than 1 day → delete output, mark `EXPIRED`
+- weekly: `PENDING_UPLOAD`/`FAILED` older than 15 min → delete object, mark `EXPIRED`
+- weekly: `COMPLETED` older than 7 days → delete output, mark `EXPIRED`
+
+Both sweeps run weekly on purpose: they were per-minute/daily, which burned VPS CPU and Neon compute hours for almost always empty result sets. MinIO's own lifecycle rule is what actually keeps storage bounded between sweeps.
 
 Rows are only marked after the S3 delete succeeds, so failed sweeps retry naturally. MinIO also has a lifecycle rule expiring raw uploads after 1 day.
 
@@ -66,7 +68,7 @@ A single `Compression` model owns the full lifecycle (source → job → output)
 
 - `src/modules/compressor/` — controller, service, repository, DTOs, BullMQ producer (`compression.producer.ts`, `compressor.queue.ts`)
 - `src/modules/cleanup/` — cron sweeps (expired uploads/outputs)
-- `src/modules/aws/s3.service.ts` — S3 client + presigned URLs (MinIO endpoint)
+- `src/modules/cloud/s3.service.ts` — S3 client + presigned URLs (MinIO endpoint)
 - `src/db/` — Prisma service, Redis subscriber (SSE wake), generated client
 - `src/config/` — zod env (`env.ts`), better-auth config
 - `compose.dev.yml` / `compose.prod.yml` / `compose.queue.yml` — local infra / prod API+MinIO / queue Redis. Prod composes join the external Docker network `saturn-net`, shared with the worker.
