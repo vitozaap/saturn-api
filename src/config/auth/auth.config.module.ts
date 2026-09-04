@@ -1,12 +1,11 @@
 import { AuthConfigService } from "./auth.config.service";
 import { AUTH_CONFIG } from "./symbols";
-import { PrismaService } from "../../db/prisma.service";
 import { Module } from "@nestjs/common";
-
+import { ResendModule } from "../../modules/resend/resend.module";
 
 @Module({
-    imports: [],
-    providers: [PrismaService, AuthConfigService],
-    exports: [AUTH_CONFIG]
+	imports: [ResendModule],
+	providers: [AuthConfigService],
+	exports: [AUTH_CONFIG],
 })
-export class AuthConfigModule { }
+export class AuthConfigModule {}
