@@ -11,7 +11,7 @@ import { ResendService } from "../../modules/resend/resend.service";
 
 export const AuthConfigService = {
 	provide: AUTH_CONFIG,
-	inject: [PrismaService, ConfigService],
+	inject: [PrismaService, ConfigService, ResendService],
 	useFactory: (
 		prisma: PrismaService,
 		config: ConfigService<Env>,
