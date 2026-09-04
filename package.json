@@ -39,6 +39,7 @@
     "ioredis": "^5.11.1",
     "minio": "^8.0.7",
     "reflect-metadata": "^0.2.2",
+    "resend": "^6.26.0",
     "rxjs": "^7.8.2",
     "zod": "^4.4.3"
   },
