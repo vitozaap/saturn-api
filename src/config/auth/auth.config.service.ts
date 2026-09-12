@@ -87,6 +87,7 @@ export const AuthConfigService = {
 			secret: config.getOrThrow("BETTER_AUTH_SECRET"),
 			emailAndPassword: {
 				enabled: true,
+                requireEmailVerification: true
 			},
 
 			advanced: {
