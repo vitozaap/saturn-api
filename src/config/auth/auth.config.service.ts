@@ -2,7 +2,7 @@ import { AUTH_CONFIG } from "./symbols";
 import { PrismaService } from "../../db/prisma.service";
 import { ConfigService } from "@nestjs/config";
 import { betterAuth } from "better-auth/minimal";
-import { anonymous, openAPI } from "better-auth/plugins";
+import { anonymous, emailOTP, openAPI } from "better-auth/plugins";
 import { prismaAdapter } from "@better-auth/prisma-adapter";
 import type { Env } from "../env";
 import { migrateAnonymousUserData } from "./migrate-anonymous";
@@ -41,48 +41,54 @@ export const AuthConfigService = {
 						}
 					},
 				}),
+				emailOTP({
+					overrideDefaultEmailVerification: true,
+					async sendVerificationOTP({ email, otp, type }) {
+						const from = "Squish <support@squish.digital>";
+						switch (type) {
+							case "email-verification":
+								await resend.emails.send({
+									from: from,
+									to: email,
+									subject: "SQUISH - Código de Uso Único",
+									template: {
+										id: "otp-code",
+										variables: {
+											CODE: otp,
+										},
+									},
+								});
+								break;
+							case "forget-password":
+								await resend.emails.send({
+									from: from,
+									to: email,
+									subject: "SQUISH - Código de Uso Único",
+									template: {
+										id: "otp-code",
+										variables: {
+											CODE: otp,
+										},
+									},
+								});
+								break;
+							case "change-email":
+                                // TODO: "change email" email
+								break;
+							case "sign-in":
+								// TODO: "sign-in" email
+								break;
+						}
+					},
+				}),
 				openAPI({ disableDefaultReference: true }),
 			],
 			trustedOrigins: [config.getOrThrow("WEB_URL")],
 			secret: config.getOrThrow("BETTER_AUTH_SECRET"),
 			emailAndPassword: {
 				enabled: true,
-				requireEmailVerification: true,
-				customSyntheticUser: ({ coreFields, additionalFields, id }) => ({
-					...coreFields,
-					isAnonymous: false,
-					...additionalFields,
-					id,
-				}),
-				sendResetPassword: async ({ url, user }) => {
-					void (await resend.emails.send({
-						from: "Squish <support@squish.digital>",
-						to: user.email,
-						subject: "Redefinição de Senha",
-						template: {
-							id: "reset-password",
-							variables: {
-								URL: url,
-							},
-						},
-					}));
-				},
 			},
-			emailVerification: {
-				sendVerificationEmail: async ({ user, url }) => {
-					void (await resend.emails.send({
-						from: "Squish <support@squish.digital>",
-						to: user.email,
-						subject: "SQUISH - Verificação de conta",
-						template: {
-							id: "validate-email",
-							variables: {
-								URL: url,
-							},
-						},
-					}));
-				},
-			},
+
 			advanced: {
 				cookiePrefix: "squish",
 			},
