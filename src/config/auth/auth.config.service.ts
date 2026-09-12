@@ -67,7 +67,7 @@ export const AuthConfigService = {
 									template: {
 										id: "otp-code",
 										variables: {
-											CODE: otp,
+											code: otp,
 										},
 									},
 								});
